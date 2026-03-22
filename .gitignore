@@ -17,6 +17,7 @@ build/
 # Tools
 compile_commands.json
 .claude/
+corpus/
 
 # Coverage
 *.gcno
