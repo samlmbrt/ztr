@@ -8,11 +8,11 @@ A modern, ergonomic, and secure string library for C.
 
 C's standard string handling (`char*` + `strlen` + `strcat` + manual `malloc`) is error-prone, verbose, and hostile to both beginners and experts. `ztr` fixes this with a small, focused API that makes correct usage easy and incorrect usage hard:
 
-- **Small string optimization** -- strings of 15 bytes or fewer (7 on 32-bit) live inline in the struct. No heap allocation, no pointer chasing.
-- **Branchless `ztr_len`** -- length is always a single load + mask. No SSO/heap branching on the hottest accessor.
-- **Safe by default** -- all mutation functions handle self-referential input (e.g., `ztr_append(&s, ztr_cstr(&s))`), check for integer overflow, and provide a strong guarantee (unmodified on error).
-- **Zero-init is valid** -- `ztr s = {0}` is a valid empty string. No constructor call required.
-- **`const char*` interop** -- `ztr_cstr()` is always O(1) and null-terminated. Pass it directly to `printf`, `fopen`, `strcmp`, or any C API.
+- **Small string optimization** — strings of 15 bytes or fewer (7 on 32-bit) live inline in the struct. No heap allocation, no pointer chasing.
+- **Branchless `ztr_len`** — length is always a single load + mask. No SSO/heap branching on the hottest accessor.
+- **Safe by default** — all mutation functions handle self-referential input (e.g., `ztr_append(&s, ztr_cstr(&s))`), check for integer overflow, and provide a strong guarantee (unmodified on error).
+- **Zero-init is valid** — `ztr s = {0}` is a valid empty string. No constructor call required.
+- **`const char*` interop** — `ztr_cstr()` is always O(1) and null-terminated. Pass it directly to `printf`, `fopen`, `strcmp`, or any C API.
 
 ## Quick start
 
@@ -47,7 +47,7 @@ target_link_libraries(your_target PRIVATE ztr)
 #include <stdio.h>
 
 int main(void) {
-    // Construction
+    // Construction (error checks omitted for brevity)
     ztr greeting = {0};
     ztr_from(&greeting, "hello");
     ztr_append(&greeting, ", world!");
@@ -171,7 +171,7 @@ typedef struct ztr {
     size_t len;   // high bit = heap flag, remaining bits = byte length
     union {
         struct { char *data; size_t cap; } heap;
-        char sso[sizeof(char*) + sizeof(size_t)];
+        char sso[sizeof(char *) + sizeof(size_t)];
     };
 } ztr;  // 24 bytes on 64-bit, 12 bytes on 32-bit
 ```
@@ -183,8 +183,8 @@ typedef struct ztr {
 
 ## Documentation
 
-- [docs/SPEC.md](docs/SPEC.md) -- complete API specification (signatures, edge cases, guarantees)
-- [docs/DESIGN_DISCUSSION.md](docs/DESIGN_DISCUSSION.md) -- design panel record (rationale, alternatives considered, trade-offs)
+- [docs/SPEC.md](docs/SPEC.md) — complete API specification (signatures, edge cases, guarantees)
+- [docs/DESIGN_DISCUSSION.md](docs/DESIGN_DISCUSSION.md) — design panel record (rationale, alternatives considered, trade-offs)
 
 ## License
 
