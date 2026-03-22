@@ -40,7 +40,7 @@ coverage:
 	@echo "Coverage report: build/coverage/html/index.html"
 
 format:
-	find src tests -name '*.c' -o -name '*.h' | grep -v greatest.h | xargs clang-format -i
+	find src tests fuzz benchmarks -name '*.c' -o -name '*.h' | grep -v greatest.h | xargs clang-format -i
 
 clean:
 	rm -rf build

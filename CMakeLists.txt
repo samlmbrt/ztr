@@ -12,9 +12,13 @@ target_include_directories(ztr PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
     $<INSTALL_INTERFACE:include>
 )
-target_compile_options(ztr PRIVATE
-    -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror
-)
+if(MSVC)
+    target_compile_options(ztr PRIVATE /W4 /WX)
+else()
+    target_compile_options(ztr PRIVATE
+        -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror
+    )
+endif()
 
 # --- Sanitizer flags (Sanitize build type) ---
 
@@ -51,9 +55,13 @@ if(ZTR_BUILD_TESTS)
     )
     target_include_directories(ztr_tests PRIVATE tests)
     target_link_libraries(ztr_tests PRIVATE ztr)
-    target_compile_options(ztr_tests PRIVATE
-        -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror
-    )
+    if(MSVC)
+        target_compile_options(ztr_tests PRIVATE /W4 /WX)
+    else()
+        target_compile_options(ztr_tests PRIVATE
+            -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Werror
+        )
+    endif()
 
     add_test(NAME ztr_tests COMMAND ztr_tests)
 endif()
