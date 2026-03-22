@@ -1,3 +1,6 @@
+/* SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Samuel Lambert */
+
 #ifndef ZTR_H
 #define ZTR_H
 
