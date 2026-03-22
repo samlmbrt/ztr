@@ -88,7 +88,7 @@ int main(void) {
 
 ## API overview
 
-57 functions organized by category:
+62 functions organized by category:
 
 | Category | Functions | Description |
 |---|---|---|

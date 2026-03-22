@@ -628,7 +628,7 @@ bool ztr_is_ascii(const ztr *s);
 | `ztr_swap`            | `void`        | No             | Interop        |
 | `ztr_is_ascii`        | `bool`        | No             | Utility        |
 
-**Total: 57 functions** (10 `static inline` in header, 47 in `ztr.c`).
+**Total: 62 functions** (6 `static inline` in header, 56 in `ztr.c`).
 
 ---
 
