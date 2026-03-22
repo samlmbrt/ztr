@@ -1,8 +1,24 @@
+# Build artifacts
 build/
 *.o
 *.a
 *.so
 *.dylib
+
+# Editor / IDE
 .cache/
-.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Tools
 compile_commands.json
+.claude/
+
+# Coverage
+*.gcno
+*.gcda
+*.gcov
