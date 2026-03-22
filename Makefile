@@ -22,9 +22,11 @@ bench:
 	./build/release/ztr_bench
 
 fuzz:
-	@[ -d build/fuzz ] || cmake --preset fuzz
+	@[ -d build/fuzz ] || cmake --preset fuzz \
+		$(if $(shell which /opt/homebrew/opt/llvm/bin/clang 2>/dev/null),-DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang) \
+		$(if $(shell which /usr/local/opt/llvm/bin/clang 2>/dev/null),-DCMAKE_C_COMPILER=/usr/local/opt/llvm/bin/clang)
 	cmake --build build/fuzz
-	@echo "Run: ./build/fuzz/ztr_fuzz corpus/"
+	@echo "Run: ./build/fuzz/ztr_fuzz corpus/ -max_len=4096 -max_total_time=300"
 
 valgrind: debug
 	valgrind --leak-check=full --error-exitcode=1 ./build/debug/ztr_tests
