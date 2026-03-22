@@ -4,10 +4,6 @@
 /* TODO: add tests for split_begin, split_next, split_alloc, split_free,
    join, join_cstr */
 
-TEST placeholder(void) {
-    PASS();
-}
+TEST split_join_placeholder(void) { PASS(); }
 
-SUITE(split_join) {
-    RUN_TEST(placeholder);
-}
+SUITE(split_join) { RUN_TEST(split_join_placeholder); }

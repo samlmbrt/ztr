@@ -3,10 +3,6 @@
 
 /* TODO: add tests for trim, trim_start, trim_end, to_ascii_upper, to_ascii_lower */
 
-TEST placeholder(void) {
-    PASS();
-}
+TEST transform_placeholder(void) { PASS(); }
 
-SUITE(transform) {
-    RUN_TEST(placeholder);
-}
+SUITE(transform) { RUN_TEST(transform_placeholder); }

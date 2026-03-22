@@ -91,15 +91,15 @@ _Static_assert(sizeof(ztr) == sizeof(size_t) * 3, "unexpected ztr struct size");
 
 ### Properties
 
-| Property | Value |
-|---|---|
-| `sizeof(ztr)` | 24 on 64-bit, 12 on 32-bit |
-| SSO capacity | 15 bytes (64-bit), 7 bytes (32-bit), excluding null terminator |
+| Property              | Value                                                                |
+| --------------------- | -------------------------------------------------------------------- |
+| `sizeof(ztr)`         | 24 on 64-bit, 12 on 32-bit                                           |
+| SSO capacity          | 15 bytes (64-bit), 7 bytes (32-bit), excluding null terminator       |
 | Maximum string length | `ZTR_MAX_LEN` = `SIZE_MAX >> 1` (~4.6 EB on 64-bit, ~1 GB on 32-bit) |
-| Zero-initialized | `ztr s = {0}` is a valid empty SSO string |
-| `ztr_len` cost | 1 load + 1 AND, zero branches |
-| Pointer assumptions | None |
-| Endianness concerns | None |
+| Zero-initialized      | `ztr s = {0}` is a valid empty SSO string                            |
+| `ztr_len` cost        | 1 load + 1 AND, zero branches                                        |
+| Pointer assumptions   | None                                                                 |
+| Endianness concerns   | None                                                                 |
 
 ### Discriminator
 
@@ -308,6 +308,7 @@ bool ztr_eq_ascii_nocase(const ztr *a, const ztr *b);
 All search functions use byte offsets and return `ZTR_NPOS` (`(size_t)-1`) when not found.
 
 **Empty needle behavior:** Passing an empty string `""` as needle:
+
 - `ztr_find`: returns `start` (the empty string is found at every position).
 - `ztr_rfind`: returns `start` (or `ztr_len(s)` if `start == ZTR_NPOS`).
 - `ztr_contains`: returns `true`.
@@ -562,70 +563,70 @@ bool ztr_is_ascii(const ztr *s);
 
 ## 7. API Summary Table
 
-| Function | Returns | Can Allocate? | Category |
-|---|---|---|---|
-| `ztr_init` | `void` | No | Lifecycle |
-| `ztr_from` | `ztr_err` | Yes | Lifecycle |
-| `ztr_from_buf` | `ztr_err` | Yes | Lifecycle |
-| `ztr_with_cap` | `ztr_err` | Yes | Lifecycle |
-| `ztr_fmt` | `ztr_err` | Yes | Lifecycle |
-| `ztr_clone` | `ztr_err` | Yes | Lifecycle |
-| `ztr_assign` | `ztr_err` | Yes | Lifecycle |
-| `ztr_assign_buf` | `ztr_err` | Yes | Lifecycle |
-| `ztr_move` | `void` | No | Lifecycle |
-| `ztr_free` | `void` | No (frees) | Lifecycle |
-| `ztr_len` | `size_t` | No | Accessor |
-| `ztr_cstr` | `const char*` | No | Accessor |
-| `ztr_is_empty` | `bool` | No | Accessor |
-| `ztr_capacity` | `size_t` | No | Accessor |
-| `ztr_at` | `char` | No | Accessor |
-| `ztr_err_str` | `const char*` | No | Accessor |
-| `ztr_eq` | `bool` | No | Comparison |
-| `ztr_eq_cstr` | `bool` | No | Comparison |
-| `ztr_cmp` | `int` | No | Comparison |
-| `ztr_cmp_cstr` | `int` | No | Comparison |
-| `ztr_eq_ascii_nocase` | `bool` | No | Comparison |
-| `ztr_find` | `size_t` | No | Search |
-| `ztr_rfind` | `size_t` | No | Search |
-| `ztr_contains` | `bool` | No | Search |
-| `ztr_starts_with` | `bool` | No | Search |
-| `ztr_ends_with` | `bool` | No | Search |
-| `ztr_count` | `size_t` | No | Search |
-| `ztr_append` | `ztr_err` | Yes | Mutation |
-| `ztr_append_buf` | `ztr_err` | Yes | Mutation |
-| `ztr_append_ztr` | `ztr_err` | Yes | Mutation |
-| `ztr_append_byte` | `ztr_err` | Yes | Mutation |
-| `ztr_append_fmt` | `ztr_err` | Yes | Mutation |
-| `ztr_insert` | `ztr_err` | Yes | Mutation |
-| `ztr_insert_buf` | `ztr_err` | Yes | Mutation |
-| `ztr_erase` | `void` | No | Mutation |
-| `ztr_replace_first` | `ztr_err` | Yes | Mutation |
-| `ztr_replace_all` | `ztr_err` | Yes | Mutation |
-| `ztr_clear` | `void` | No | Mutation |
-| `ztr_truncate` | `void` | No | Mutation |
-| `ztr_reserve` | `ztr_err` | Yes | Mutation |
-| `ztr_shrink_to_fit` | `void` | No | Mutation |
-| `ztr_trim` | `void` | No | Transformation |
-| `ztr_trim_start` | `void` | No | Transformation |
-| `ztr_trim_end` | `void` | No | Transformation |
-| `ztr_to_ascii_upper` | `void` | No | Transformation |
-| `ztr_to_ascii_lower` | `void` | No | Transformation |
-| `ztr_substr` | `ztr_err` | Yes | Extraction |
-| `ztr_split_begin` | `void` | No | Split/Join |
-| `ztr_split_next` | `bool` | No | Split/Join |
-| `ztr_split_alloc` | `ztr_err` | Yes | Split/Join |
-| `ztr_split_free` | `void` | No (frees) | Split/Join |
-| `ztr_join` | `ztr_err` | Yes | Split/Join |
-| `ztr_join_cstr` | `ztr_err` | Yes | Split/Join |
-| `ztr_is_valid_utf8` | `bool` | No | UTF-8 |
-| `ztr_utf8_len` | `ztr_err` | No | UTF-8 |
-| `ztr_utf8_next` | `ztr_err` | No | UTF-8 |
-| `ztr_utf8_append` | `ztr_err` | Yes | UTF-8 |
-| `ztr_data_mut` | `char*` | No | Interop |
-| `ztr_set_len` | `ztr_err` | No | Interop |
-| `ztr_detach` | `ztr_err` | Yes (SSO case) | Interop |
-| `ztr_swap` | `void` | No | Interop |
-| `ztr_is_ascii` | `bool` | No | Utility |
+| Function              | Returns       | Can Allocate?  | Category       |
+| --------------------- | ------------- | -------------- | -------------- |
+| `ztr_init`            | `void`        | No             | Lifecycle      |
+| `ztr_from`            | `ztr_err`     | Yes            | Lifecycle      |
+| `ztr_from_buf`        | `ztr_err`     | Yes            | Lifecycle      |
+| `ztr_with_cap`        | `ztr_err`     | Yes            | Lifecycle      |
+| `ztr_fmt`             | `ztr_err`     | Yes            | Lifecycle      |
+| `ztr_clone`           | `ztr_err`     | Yes            | Lifecycle      |
+| `ztr_assign`          | `ztr_err`     | Yes            | Lifecycle      |
+| `ztr_assign_buf`      | `ztr_err`     | Yes            | Lifecycle      |
+| `ztr_move`            | `void`        | No             | Lifecycle      |
+| `ztr_free`            | `void`        | No (frees)     | Lifecycle      |
+| `ztr_len`             | `size_t`      | No             | Accessor       |
+| `ztr_cstr`            | `const char*` | No             | Accessor       |
+| `ztr_is_empty`        | `bool`        | No             | Accessor       |
+| `ztr_capacity`        | `size_t`      | No             | Accessor       |
+| `ztr_at`              | `char`        | No             | Accessor       |
+| `ztr_err_str`         | `const char*` | No             | Accessor       |
+| `ztr_eq`              | `bool`        | No             | Comparison     |
+| `ztr_eq_cstr`         | `bool`        | No             | Comparison     |
+| `ztr_cmp`             | `int`         | No             | Comparison     |
+| `ztr_cmp_cstr`        | `int`         | No             | Comparison     |
+| `ztr_eq_ascii_nocase` | `bool`        | No             | Comparison     |
+| `ztr_find`            | `size_t`      | No             | Search         |
+| `ztr_rfind`           | `size_t`      | No             | Search         |
+| `ztr_contains`        | `bool`        | No             | Search         |
+| `ztr_starts_with`     | `bool`        | No             | Search         |
+| `ztr_ends_with`       | `bool`        | No             | Search         |
+| `ztr_count`           | `size_t`      | No             | Search         |
+| `ztr_append`          | `ztr_err`     | Yes            | Mutation       |
+| `ztr_append_buf`      | `ztr_err`     | Yes            | Mutation       |
+| `ztr_append_ztr`      | `ztr_err`     | Yes            | Mutation       |
+| `ztr_append_byte`     | `ztr_err`     | Yes            | Mutation       |
+| `ztr_append_fmt`      | `ztr_err`     | Yes            | Mutation       |
+| `ztr_insert`          | `ztr_err`     | Yes            | Mutation       |
+| `ztr_insert_buf`      | `ztr_err`     | Yes            | Mutation       |
+| `ztr_erase`           | `void`        | No             | Mutation       |
+| `ztr_replace_first`   | `ztr_err`     | Yes            | Mutation       |
+| `ztr_replace_all`     | `ztr_err`     | Yes            | Mutation       |
+| `ztr_clear`           | `void`        | No             | Mutation       |
+| `ztr_truncate`        | `void`        | No             | Mutation       |
+| `ztr_reserve`         | `ztr_err`     | Yes            | Mutation       |
+| `ztr_shrink_to_fit`   | `void`        | No             | Mutation       |
+| `ztr_trim`            | `void`        | No             | Transformation |
+| `ztr_trim_start`      | `void`        | No             | Transformation |
+| `ztr_trim_end`        | `void`        | No             | Transformation |
+| `ztr_to_ascii_upper`  | `void`        | No             | Transformation |
+| `ztr_to_ascii_lower`  | `void`        | No             | Transformation |
+| `ztr_substr`          | `ztr_err`     | Yes            | Extraction     |
+| `ztr_split_begin`     | `void`        | No             | Split/Join     |
+| `ztr_split_next`      | `bool`        | No             | Split/Join     |
+| `ztr_split_alloc`     | `ztr_err`     | Yes            | Split/Join     |
+| `ztr_split_free`      | `void`        | No (frees)     | Split/Join     |
+| `ztr_join`            | `ztr_err`     | Yes            | Split/Join     |
+| `ztr_join_cstr`       | `ztr_err`     | Yes            | Split/Join     |
+| `ztr_is_valid_utf8`   | `bool`        | No             | UTF-8          |
+| `ztr_utf8_len`        | `ztr_err`     | No             | UTF-8          |
+| `ztr_utf8_next`       | `ztr_err`     | No             | UTF-8          |
+| `ztr_utf8_append`     | `ztr_err`     | Yes            | UTF-8          |
+| `ztr_data_mut`        | `char*`       | No             | Interop        |
+| `ztr_set_len`         | `ztr_err`     | No             | Interop        |
+| `ztr_detach`          | `ztr_err`     | Yes (SSO case) | Interop        |
+| `ztr_swap`            | `void`        | No             | Interop        |
+| `ztr_is_ascii`        | `bool`        | No             | Utility        |
 
 **Total: 57 functions** (10 `static inline` in header, 47 in `ztr.c`).
 
@@ -742,4 +743,4 @@ The following features are intentionally deferred from v1. The v1 data structure
 
 ---
 
-*This specification is the authoritative reference for implementing ztr v1.*
+_This specification is the authoritative reference for implementing ztr v1._

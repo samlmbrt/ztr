@@ -3,10 +3,6 @@
 
 /* TODO: add tests for eq, eq_cstr, cmp, cmp_cstr, eq_ascii_nocase */
 
-TEST placeholder(void) {
-    PASS();
-}
+TEST comparison_placeholder(void) { PASS(); }
 
-SUITE(comparison) {
-    RUN_TEST(placeholder);
-}
+SUITE(comparison) { RUN_TEST(comparison_placeholder); }

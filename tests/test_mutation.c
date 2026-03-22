@@ -5,10 +5,6 @@
    insert, insert_buf, erase, replace_first, replace_all, clear, truncate,
    reserve, shrink_to_fit */
 
-TEST placeholder(void) {
-    PASS();
-}
+TEST mutation_placeholder(void) { PASS(); }
 
-SUITE(mutation) {
-    RUN_TEST(placeholder);
-}
+SUITE(mutation) { RUN_TEST(mutation_placeholder); }

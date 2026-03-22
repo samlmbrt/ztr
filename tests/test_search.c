@@ -3,10 +3,6 @@
 
 /* TODO: add tests for find, rfind, contains, starts_with, ends_with, count */
 
-TEST placeholder(void) {
-    PASS();
-}
+TEST search_placeholder(void) { PASS(); }
 
-SUITE(search) {
-    RUN_TEST(placeholder);
-}
+SUITE(search) { RUN_TEST(search_placeholder); }

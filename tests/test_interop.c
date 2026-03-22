@@ -3,10 +3,6 @@
 
 /* TODO: add tests for data_mut, set_len, detach, swap */
 
-TEST placeholder(void) {
-    PASS();
-}
+TEST interop_placeholder(void) { PASS(); }
 
-SUITE(interop) {
-    RUN_TEST(placeholder);
-}
+SUITE(interop) { RUN_TEST(interop_placeholder); }
