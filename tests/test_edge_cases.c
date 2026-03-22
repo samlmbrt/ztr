@@ -691,6 +691,199 @@ TEST append_buf_null_buf_nonzero_len_returns_null_arg(void) {
     PASS();
 }
 
+/* ---- Coverage gap tests ---- */
+
+TEST substr_self_alias_middle(void) {
+    ztr s;
+    ztr_from(&s, "hello world");
+    ztr_substr(&s, (const ztr *)&s, 6, 5);
+    ASSERT_STR_EQ("world", ztr_cstr(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST substr_self_alias_pos_ge_len(void) {
+    ztr s;
+    ztr_from(&s, "hello");
+    ztr_substr(&s, (const ztr *)&s, 100, 5);
+    ASSERT_EQ((size_t)0, ztr_len(&s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST substr_self_alias_clamp_count(void) {
+    ztr s;
+    ztr_from(&s, "hello world");
+    ztr_substr(&s, (const ztr *)&s, 3, 999);
+    ASSERT_STR_EQ("lo world", ztr_cstr(&s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST replace_first_on_heap_string_shorter(void) {
+    ztr s;
+    ztr_from(&s, "the quick brown fox jumps over the lazy dog");
+    ztr_replace_first(&s, "jumps over", "ate");
+    ASSERT_STR_EQ("the quick brown fox ate the lazy dog", ztr_cstr(&s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST replace_first_on_heap_string_longer(void) {
+    ztr s;
+    ztr_from(&s, "the quick brown fox jumps over the lazy dog");
+    ztr_replace_first(&s, "fox", "elephant");
+    ASSERT_STR_EQ("the quick brown elephant jumps over the lazy dog", ztr_cstr(&s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST replace_first_on_heap_string_same_len(void) {
+    ztr s;
+    ztr_from(&s, "the quick brown fox jumps over the lazy dog");
+    ztr_replace_first(&s, "fox", "cat");
+    ASSERT_STR_EQ("the quick brown cat jumps over the lazy dog", ztr_cstr(&s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_len_rejects_overlong(void) {
+    ztr s;
+    /* Overlong 2-byte encoding of 'A' (U+0041): 0xC1 0x81 */
+    ztr_from_buf(&s, "\xC1\x81", 2);
+    size_t count = 0;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_len(&count, &s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_len_rejects_surrogate(void) {
+    ztr s;
+    /* U+D800 encoded as UTF-8: 0xED 0xA0 0x80 */
+    ztr_from_buf(&s, "\xED\xA0\x80", 3);
+    size_t count = 0;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_len(&count, &s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_len_rejects_above_max(void) {
+    ztr s;
+    /* U+110000 (above U+10FFFF): 0xF4 0x90 0x80 0x80 */
+    ztr_from_buf(&s, "\xF4\x90\x80\x80", 4);
+    size_t count = 0;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_len(&count, &s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_len_rejects_bad_continuation(void) {
+    ztr s;
+    /* Valid 2-byte lead followed by non-continuation byte */
+    ztr_from_buf(&s, "\xC3\x00", 2);
+    size_t count = 0;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_len(&count, &s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_len_rejects_3byte_overlong(void) {
+    ztr s;
+    /* 3-byte overlong: U+007F encoded as 0xE0 0x81 0xBF */
+    ztr_from_buf(&s, "\xE0\x81\xBF", 3);
+    size_t count = 0;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_len(&count, &s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_len_rejects_4byte_overlong(void) {
+    ztr s;
+    /* 4-byte overlong: U+07FF encoded as 0xF0 0x80 0x9F 0xBF */
+    ztr_from_buf(&s, "\xF0\x80\x9F\xBF", 4);
+    size_t count = 0;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_len(&count, &s));
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_next_overlong_2byte(void) {
+    ztr s;
+    ztr_from_buf(&s, "\xC1\x81", 2);
+    size_t pos = 0;
+    uint32_t cp;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_next(&s, &pos, &cp));
+    ASSERT_EQ((uint32_t)0xFFFD, cp);
+    ASSERT_EQ((size_t)1, pos); /* advances by 1 */
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_next_overlong_3byte(void) {
+    ztr s;
+    ztr_from_buf(&s, "\xE0\x81\xBF", 3);
+    size_t pos = 0;
+    uint32_t cp;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_next(&s, &pos, &cp));
+    ASSERT_EQ((uint32_t)0xFFFD, cp);
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_next_overlong_4byte(void) {
+    ztr s;
+    ztr_from_buf(&s, "\xF0\x80\x9F\xBF", 4);
+    size_t pos = 0;
+    uint32_t cp;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_next(&s, &pos, &cp));
+    ASSERT_EQ((uint32_t)0xFFFD, cp);
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_next_surrogate(void) {
+    ztr s;
+    ztr_from_buf(&s, "\xED\xA0\x80", 3);
+    size_t pos = 0;
+    uint32_t cp;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_next(&s, &pos, &cp));
+    ASSERT_EQ((uint32_t)0xFFFD, cp);
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_next_above_max(void) {
+    ztr s;
+    ztr_from_buf(&s, "\xF4\x90\x80\x80", 4);
+    size_t pos = 0;
+    uint32_t cp;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_next(&s, &pos, &cp));
+    ASSERT_EQ((uint32_t)0xFFFD, cp);
+    ztr_free(&s);
+    PASS();
+}
+
+TEST utf8_next_bad_continuation_after_lead(void) {
+    ztr s;
+    /* 3-byte lead 0xE2 followed by non-continuation 0x41 ('A') */
+    ztr_from_buf(&s, "\xE2\x41", 2);
+    size_t pos = 0;
+    uint32_t cp;
+    ASSERT_EQ(ZTR_ERR_INVALID_UTF8, ztr_utf8_next(&s, &pos, &cp));
+    ASSERT_EQ((uint32_t)0xFFFD, cp);
+    ASSERT_EQ((size_t)1, pos);
+    ztr_free(&s);
+    PASS();
+}
+
+TEST err_str_invalid_code_returns_unknown(void) {
+    const char *msg = ztr_err_str((ztr_err)999);
+    ASSERT(msg != NULL);
+    ASSERT_STR_EQ("unknown error", msg);
+    PASS();
+}
+
 /* ---- Suite ---- */
 
 SUITE(edge_cases) {
@@ -759,4 +952,25 @@ SUITE(edge_cases) {
     RUN_TEST(substr_pos_ge_len_gives_empty);
     RUN_TEST(substr_full_string);
     RUN_TEST(substr_empty_source);
+
+    /* Coverage gap tests */
+    RUN_TEST(substr_self_alias_middle);
+    RUN_TEST(substr_self_alias_pos_ge_len);
+    RUN_TEST(substr_self_alias_clamp_count);
+    RUN_TEST(replace_first_on_heap_string_shorter);
+    RUN_TEST(replace_first_on_heap_string_longer);
+    RUN_TEST(replace_first_on_heap_string_same_len);
+    RUN_TEST(utf8_len_rejects_overlong);
+    RUN_TEST(utf8_len_rejects_surrogate);
+    RUN_TEST(utf8_len_rejects_above_max);
+    RUN_TEST(utf8_len_rejects_bad_continuation);
+    RUN_TEST(utf8_len_rejects_3byte_overlong);
+    RUN_TEST(utf8_len_rejects_4byte_overlong);
+    RUN_TEST(utf8_next_overlong_2byte);
+    RUN_TEST(utf8_next_overlong_3byte);
+    RUN_TEST(utf8_next_overlong_4byte);
+    RUN_TEST(utf8_next_surrogate);
+    RUN_TEST(utf8_next_above_max);
+    RUN_TEST(utf8_next_bad_continuation_after_lead);
+    RUN_TEST(err_str_invalid_code_returns_unknown);
 }
