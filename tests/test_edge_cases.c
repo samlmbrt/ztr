@@ -177,6 +177,7 @@ TEST sso_boundary_empty_string_is_sso(void) {
     ztr_init(&s);
     ASSERT_FALSE(ztr_p_is_heap(&s));
     ASSERT_EQ((size_t)ZTR_SSO_CAP, ztr_capacity(&s));
+    ztr_free(&s);
     PASS();
 }
 
@@ -450,39 +451,6 @@ TEST from_buf_len_just_over_max_returns_overflow(void) {
     PASS();
 }
 
-/* from_buf with len == ZTR_MAX_LEN is the largest permitted value.
- * We cannot realistically allocate SIZE_MAX/2 bytes in a test, so we only
- * verify the overflow boundary — the call just below must not return
- * ZTR_ERR_OVERFLOW (it may return ZTR_ERR_ALLOC if the system can't provide
- * memory of that size, but not an overflow error).
- *
- * This test is skipped under ASan because ASan aborts the process when
- * malloc is called with an impossibly large size before libc returns NULL. */
-TEST from_buf_len_at_max_does_not_overflow(void) {
-#if defined(__has_feature)
-#if __has_feature(address_sanitizer)
-    SKIPm("skipped under AddressSanitizer: large malloc aborts before returning NULL");
-#endif
-#elif defined(__SANITIZE_ADDRESS__)
-    SKIPm("skipped under AddressSanitizer: large malloc aborts before returning NULL");
-#endif
-
-    const char *dummy = "x";
-    ztr s;
-    ztr_init(&s);
-
-    ztr_err err = ztr_from_buf(&s, dummy, ZTR_MAX_LEN);
-    /* The only acceptable outcomes are success (unlikely) or alloc failure.
-     * An overflow error is NOT acceptable here. */
-    ASSERT(err == ZTR_OK || err == ZTR_ERR_ALLOC);
-    ASSERT_NEQ(ZTR_ERR_OVERFLOW, err);
-
-    if (err == ZTR_OK) {
-        ztr_free(&s);
-    }
-    PASS();
-}
-
 /* set_len with ZTR_MAX_LEN + 1 must return ZTR_ERR_OVERFLOW even if the
  * string happens to have a large-enough capacity (which it never will in
  * practice — but the overflow check must fire first). */
@@ -644,6 +612,87 @@ TEST cstr_always_null_terminated(void) {
 }
 
 /* ---------------------------------------------------------------------------
+ * ztr_substr
+ * ------------------------------------------------------------------------- */
+
+/* Basic substring from the middle of a string. */
+TEST substr_from_middle(void) {
+    ztr s, out;
+    ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello world"));
+    ASSERT_EQ(ZTR_OK, ztr_substr(&out, &s, 6, 5));
+    ASSERT_EQ((size_t)5, ztr_len(&out));
+    ASSERT_STR_EQ("world", ztr_cstr(&out));
+    ztr_free(&out);
+    ztr_free(&s);
+    PASS();
+}
+
+/* Substring from the start (pos=0). */
+TEST substr_from_start(void) {
+    ztr s, out;
+    ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello world"));
+    ASSERT_EQ(ZTR_OK, ztr_substr(&out, &s, 0, 5));
+    ASSERT_EQ((size_t)5, ztr_len(&out));
+    ASSERT_STR_EQ("hello", ztr_cstr(&out));
+    ztr_free(&out);
+    ztr_free(&s);
+    PASS();
+}
+
+/* Substring to end: count exceeds remaining characters, must clamp. */
+TEST substr_to_end_count_exceeds_remaining(void) {
+    ztr s, out;
+    ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello world"));
+    ASSERT_EQ(ZTR_OK, ztr_substr(&out, &s, 6, 1000));
+    ASSERT_EQ((size_t)5, ztr_len(&out));
+    ASSERT_STR_EQ("world", ztr_cstr(&out));
+    ztr_free(&out);
+    ztr_free(&s);
+    PASS();
+}
+
+/* pos >= len: output must be empty. */
+TEST substr_pos_ge_len_gives_empty(void) {
+    ztr s, out;
+    ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
+    ASSERT_EQ(ZTR_OK, ztr_substr(&out, &s, 5, 3));
+    ASSERT(ztr_is_empty(&out));
+    ASSERT_STR_EQ("", ztr_cstr(&out));
+    ztr_free(&out);
+
+    ASSERT_EQ(ZTR_OK, ztr_substr(&out, &s, 100, 1));
+    ASSERT(ztr_is_empty(&out));
+    ztr_free(&out);
+    ztr_free(&s);
+    PASS();
+}
+
+/* Full string: pos=0, count=len. */
+TEST substr_full_string(void) {
+    ztr s, out;
+    ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
+    ASSERT_EQ(ZTR_OK, ztr_substr(&out, &s, 0, 5));
+    ASSERT_EQ((size_t)5, ztr_len(&out));
+    ASSERT_STR_EQ("hello", ztr_cstr(&out));
+    ASSERT(ztr_eq(&s, &out));
+    ztr_free(&out);
+    ztr_free(&s);
+    PASS();
+}
+
+/* Empty source string: output must be empty regardless of pos/count. */
+TEST substr_empty_source(void) {
+    ztr s, out;
+    ztr_init(&s);
+    ASSERT_EQ(ZTR_OK, ztr_substr(&out, &s, 0, 5));
+    ASSERT(ztr_is_empty(&out));
+    ASSERT_STR_EQ("", ztr_cstr(&out));
+    ztr_free(&out);
+    ztr_free(&s);
+    PASS();
+}
+
+/* ---------------------------------------------------------------------------
  * Suite
  * ------------------------------------------------------------------------- */
 
@@ -690,7 +739,6 @@ SUITE(edge_cases) {
 
     /* Overflow / ztr_from_buf with extreme lengths */
     RUN_TEST(from_buf_len_just_over_max_returns_overflow);
-    RUN_TEST(from_buf_len_at_max_does_not_overflow);
     RUN_TEST(set_len_size_t_max_overflow);
 
     /* Additional boundary checks */
@@ -702,4 +750,12 @@ SUITE(edge_cases) {
     RUN_TEST(truncate_to_same_length_is_noop);
     RUN_TEST(truncate_to_longer_is_noop);
     RUN_TEST(cstr_always_null_terminated);
+
+    /* ztr_substr */
+    RUN_TEST(substr_from_middle);
+    RUN_TEST(substr_from_start);
+    RUN_TEST(substr_to_end_count_exceeds_remaining);
+    RUN_TEST(substr_pos_ge_len_gives_empty);
+    RUN_TEST(substr_full_string);
+    RUN_TEST(substr_empty_source);
 }

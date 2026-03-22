@@ -530,8 +530,8 @@ TEST utf8_append_surrogate_rejected(void) {
     PASS();
 }
 
-TEST utf8_append_high_surrogate_rejected(void) {
-    /* U+DFFF — high end of the surrogate range */
+TEST utf8_append_low_surrogate_rejected(void) {
+    /* U+DFFF — low surrogate (trailing), end of the surrogate range */
     ztr s;
     ztr_init(&s);
 
@@ -661,7 +661,7 @@ SUITE(utf8) {
     RUN_TEST(utf8_append_null_character);
     RUN_TEST(utf8_append_last_valid_codepoint);
     RUN_TEST(utf8_append_surrogate_rejected);
-    RUN_TEST(utf8_append_high_surrogate_rejected);
+    RUN_TEST(utf8_append_low_surrogate_rejected);
     RUN_TEST(utf8_append_above_max_codepoint_rejected);
     RUN_TEST(utf8_append_way_above_max_codepoint_rejected);
     RUN_TEST(utf8_append_multiple_codepoints_form_valid_string);

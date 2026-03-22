@@ -17,7 +17,7 @@ TEST append_basic(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ASSERT_EQ(ZTR_OK, ztr_append(&s, ", world"));
-    ASSERT_EQ(12u, ztr_len(&s));
+    ASSERT_EQ((size_t)12, ztr_len(&s));
     ASSERT_STR_EQ("hello, world", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -27,7 +27,7 @@ TEST append_to_empty(void) {
     ztr s;
     ztr_init(&s);
     ASSERT_EQ(ZTR_OK, ztr_append(&s, "abc"));
-    ASSERT_EQ(3u, ztr_len(&s));
+    ASSERT_EQ((size_t)3, ztr_len(&s));
     ASSERT_STR_EQ("abc", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -37,7 +37,7 @@ TEST append_null_cstr_is_noop(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ASSERT_EQ(ZTR_OK, ztr_append(&s, NULL));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -48,7 +48,7 @@ TEST append_self(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "ab"));
     ASSERT_EQ(ZTR_OK, ztr_append(&s, ztr_cstr(&s)));
-    ASSERT_EQ(4u, ztr_len(&s));
+    ASSERT_EQ((size_t)4, ztr_len(&s));
     ASSERT_STR_EQ("abab", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -60,7 +60,7 @@ TEST append_self_sso_boundary(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "abcdefg")); /* len=7, SSO */
     ASSERT(!ztr_p_is_heap(&s));
     ASSERT_EQ(ZTR_OK, ztr_append(&s, ztr_cstr(&s)));
-    ASSERT_EQ(14u, ztr_len(&s));
+    ASSERT_EQ((size_t)14, ztr_len(&s));
     ASSERT_STR_EQ("abcdefgabcdefg", ztr_cstr(&s));
     ASSERT(!ztr_p_is_heap(&s)); /* still SSO */
     ztr_free(&s);
@@ -72,14 +72,14 @@ TEST append_sso_to_heap_transition(void) {
      * a move to the heap. */
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "123456789012345")); /* len=15, SSO */
-    ASSERT_EQ(15u, ztr_len(&s));
+    ASSERT_EQ((size_t)15, ztr_len(&s));
     ASSERT(!ztr_p_is_heap(&s));
 
     ASSERT_EQ(ZTR_OK, ztr_append(&s, "X"));
-    ASSERT_EQ(16u, ztr_len(&s));
+    ASSERT_EQ((size_t)16, ztr_len(&s));
     ASSERT_STR_EQ("123456789012345X", ztr_cstr(&s));
     ASSERT(ztr_p_is_heap(&s)); /* now on the heap */
-    ASSERT(ztr_capacity(&s) >= 16u);
+    ASSERT(ztr_capacity(&s) >= (size_t)16);
     ztr_free(&s);
     PASS();
 }
@@ -92,7 +92,7 @@ TEST append_buf_basic(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "foo"));
     ASSERT_EQ(ZTR_OK, ztr_append_buf(&s, "barbaz", 3)); /* only "bar" */
-    ASSERT_EQ(6u, ztr_len(&s));
+    ASSERT_EQ((size_t)6, ztr_len(&s));
     ASSERT_STR_EQ("foobar", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -102,7 +102,7 @@ TEST append_buf_zero_len_is_noop(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ASSERT_EQ(ZTR_OK, ztr_append_buf(&s, "IGNORED", 0));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -114,7 +114,7 @@ TEST append_buf_with_embedded_null(void) {
     ztr s;
     ztr_init(&s);
     ASSERT_EQ(ZTR_OK, ztr_append_buf(&s, "ab\0cd", 5));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     /* Only the first byte after 'b' is '\0', but len is 5. */
     ASSERT_EQ('a', ztr_at(&s, 0));
     ASSERT_EQ('b', ztr_at(&s, 1));
@@ -134,7 +134,7 @@ TEST append_ztr_basic(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ASSERT_EQ(ZTR_OK, ztr_from(&t, " world"));
     ASSERT_EQ(ZTR_OK, ztr_append_ztr(&s, &t));
-    ASSERT_EQ(11u, ztr_len(&s));
+    ASSERT_EQ((size_t)11, ztr_len(&s));
     ASSERT_STR_EQ("hello world", ztr_cstr(&s));
     ztr_free(&s);
     ztr_free(&t);
@@ -146,7 +146,7 @@ TEST append_ztr_self(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "xy"));
     ASSERT_EQ(ZTR_OK, ztr_append_ztr(&s, &s));
-    ASSERT_EQ(4u, ztr_len(&s));
+    ASSERT_EQ((size_t)4, ztr_len(&s));
     ASSERT_STR_EQ("xyxy", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -183,7 +183,7 @@ TEST append_byte_basic(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hel"));
     ASSERT_EQ(ZTR_OK, ztr_append_byte(&s, 'l'));
     ASSERT_EQ(ZTR_OK, ztr_append_byte(&s, 'o'));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -201,7 +201,7 @@ TEST append_byte_sso_boundary(void) {
 
     /* One more byte forces heap allocation. */
     ASSERT_EQ(ZTR_OK, ztr_append_byte(&s, 'z'));
-    ASSERT_EQ(ZTR_SSO_CAP + 1u, ztr_len(&s));
+    ASSERT_EQ((size_t)(ZTR_SSO_CAP + 1), ztr_len(&s));
     ASSERT(ztr_p_is_heap(&s));
     ASSERT_EQ('z', ztr_at(&s, ZTR_SSO_CAP));
     ztr_free(&s);
@@ -212,7 +212,7 @@ TEST append_byte_to_empty(void) {
     ztr s;
     ztr_init(&s);
     ASSERT_EQ(ZTR_OK, ztr_append_byte(&s, 'X'));
-    ASSERT_EQ(1u, ztr_len(&s));
+    ASSERT_EQ((size_t)1, ztr_len(&s));
     ASSERT_EQ('X', ztr_at(&s, 0));
     ztr_free(&s);
     PASS();
@@ -229,7 +229,7 @@ TEST append_fmt_basic(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "val="));
     ASSERT_EQ(ZTR_OK, ztr_append_fmt(&s, "%d", 42));
     ASSERT_STR_EQ("val=42", ztr_cstr(&s));
-    ASSERT_EQ(6u, ztr_len(&s));
+    ASSERT_EQ((size_t)6, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -248,7 +248,7 @@ TEST append_fmt_empty_result_is_noop(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "keep"));
     ASSERT_EQ(ZTR_OK, ztr_append_fmt(&s, "%s", ""));
-    ASSERT_EQ(4u, ztr_len(&s));
+    ASSERT_EQ((size_t)4, ztr_len(&s));
     ASSERT_STR_EQ("keep", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -261,7 +261,7 @@ TEST append_fmt_forces_heap(void) {
     ASSERT(!ztr_p_is_heap(&s));
     ASSERT_EQ(ZTR_OK, ztr_append_fmt(&s, "%s", "XY")); /* len becomes 16 */
     ASSERT(ztr_p_is_heap(&s));
-    ASSERT_EQ(16u, ztr_len(&s));
+    ASSERT_EQ((size_t)16, ztr_len(&s));
     ASSERT_STR_EQ("12345678901234XY", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -278,7 +278,7 @@ TEST insert_at_beginning(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "world"));
     ASSERT_EQ(ZTR_OK, ztr_insert(&s, 0, "hello "));
     ASSERT_STR_EQ("hello world", ztr_cstr(&s));
-    ASSERT_EQ(11u, ztr_len(&s));
+    ASSERT_EQ((size_t)11, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -297,7 +297,7 @@ TEST insert_in_middle(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "helloworld"));
     ASSERT_EQ(ZTR_OK, ztr_insert(&s, 5, " "));
     ASSERT_STR_EQ("hello world", ztr_cstr(&s));
-    ASSERT_EQ(11u, ztr_len(&s));
+    ASSERT_EQ((size_t)11, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -306,7 +306,7 @@ TEST insert_null_cstr_is_noop(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ASSERT_EQ(ZTR_OK, ztr_insert(&s, 2, NULL));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -317,7 +317,7 @@ TEST insert_self_referential(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "ab"));
     ASSERT_EQ(ZTR_OK, ztr_insert(&s, 0, ztr_cstr(&s)));
-    ASSERT_EQ(4u, ztr_len(&s));
+    ASSERT_EQ((size_t)4, ztr_len(&s));
     ASSERT_STR_EQ("abab", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -352,7 +352,7 @@ TEST insert_buf_pos_out_of_range(void) {
     ASSERT_EQ(ZTR_ERR_OUT_OF_RANGE, ztr_insert_buf(&s, 3, "x", 1));
     /* String must be unchanged. */
     ASSERT_STR_EQ("hi", ztr_cstr(&s));
-    ASSERT_EQ(2u, ztr_len(&s));
+    ASSERT_EQ((size_t)2, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -375,7 +375,7 @@ TEST erase_from_start(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello world"));
     ztr_erase(&s, 0, 6);
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_STR_EQ("world", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -385,7 +385,7 @@ TEST erase_from_middle(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello world"));
     ztr_erase(&s, 5, 6); /* remove " world" */
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -395,7 +395,7 @@ TEST erase_from_end(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello!!!"));
     ztr_erase(&s, 5, 3);
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -405,10 +405,10 @@ TEST erase_pos_ge_len_is_noop(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ztr_erase(&s, 5, 1); /* pos == len → no-op */
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
     ztr_erase(&s, 99, 1); /* way out of range → no-op */
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -418,7 +418,7 @@ TEST erase_count_exceeds_remainder_clamped(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     /* Erase from pos 2 with count=999 — should clamp to 3. */
     ztr_erase(&s, 2, 999);
-    ASSERT_EQ(2u, ztr_len(&s));
+    ASSERT_EQ((size_t)2, ztr_len(&s));
     ASSERT_STR_EQ("he", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -428,7 +428,7 @@ TEST erase_entire_string(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ztr_erase(&s, 0, 5);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -482,7 +482,7 @@ TEST replace_first_empty_needle_is_noop(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ASSERT_EQ(ZTR_OK, ztr_replace_first(&s, "", "X"));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -492,7 +492,7 @@ TEST replace_first_replacement_shorter(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello world"));
     ASSERT_EQ(ZTR_OK, ztr_replace_first(&s, "world", "!"));
     ASSERT_STR_EQ("hello !", ztr_cstr(&s));
-    ASSERT_EQ(7u, ztr_len(&s));
+    ASSERT_EQ((size_t)7, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -502,7 +502,7 @@ TEST replace_first_replacement_same_length(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ASSERT_EQ(ZTR_OK, ztr_replace_first(&s, "ello", "appy"));
     ASSERT_STR_EQ("happy", ztr_cstr(&s));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -512,7 +512,7 @@ TEST replace_first_replacement_longer(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hi there"));
     ASSERT_EQ(ZTR_OK, ztr_replace_first(&s, "hi", "hello"));
     ASSERT_STR_EQ("hello there", ztr_cstr(&s));
-    ASSERT_EQ(11u, ztr_len(&s));
+    ASSERT_EQ((size_t)11, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -553,7 +553,7 @@ TEST replace_all_empty_needle_is_noop(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ASSERT_EQ(ZTR_OK, ztr_replace_all(&s, "", "X"));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -563,7 +563,7 @@ TEST replace_all_replacement_longer(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "a_a_a"));
     ASSERT_EQ(ZTR_OK, ztr_replace_all(&s, "a", "abc"));
     ASSERT_STR_EQ("abc_abc_abc", ztr_cstr(&s));
-    ASSERT_EQ(11u, ztr_len(&s));
+    ASSERT_EQ((size_t)11, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -573,7 +573,7 @@ TEST replace_all_replacement_shorter(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "aXXbXXc"));
     ASSERT_EQ(ZTR_OK, ztr_replace_all(&s, "XX", "-"));
     ASSERT_STR_EQ("a-b-c", ztr_cstr(&s));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -625,7 +625,7 @@ TEST clear_sso_string(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ASSERT(!ztr_p_is_heap(&s));
     ztr_clear(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT(ztr_is_empty(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
@@ -638,7 +638,7 @@ TEST clear_heap_string_preserves_capacity(void) {
     ASSERT(ztr_p_is_heap(&s));
     size_t cap_before = ztr_capacity(&s);
     ztr_clear(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT(ztr_is_empty(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     /* Capacity should be preserved (clear does not free or reallocate). */
@@ -652,7 +652,7 @@ TEST clear_already_empty(void) {
     ztr s;
     ztr_init(&s);
     ztr_clear(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -666,7 +666,7 @@ TEST truncate_shorter(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello world"));
     ztr_truncate(&s, 5);
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
     ASSERT_EQ('\0', ztr_cstr(&s)[5]); /* null terminator in place */
     ztr_free(&s);
@@ -677,7 +677,7 @@ TEST truncate_same_length_is_noop(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ztr_truncate(&s, 5);
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -687,7 +687,7 @@ TEST truncate_longer_is_noop(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ztr_truncate(&s, 100);
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -697,7 +697,7 @@ TEST truncate_to_zero(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ztr_truncate(&s, 0);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -709,7 +709,7 @@ TEST truncate_heap_string(void) {
     ASSERT(ztr_p_is_heap(&s));
     size_t cap_before = ztr_capacity(&s);
     ztr_truncate(&s, 4);
-    ASSERT_EQ(4u, ztr_len(&s));
+    ASSERT_EQ((size_t)4, ztr_len(&s));
     ASSERT_STR_EQ("this", ztr_cstr(&s));
     /* Capacity unchanged — truncate does not reallocate. */
     ASSERT_EQ(cap_before, ztr_capacity(&s));
@@ -726,9 +726,9 @@ TEST reserve_grow(void) {
     ztr_init(&s);
     ASSERT_EQ(ZTR_SSO_CAP, ztr_capacity(&s));
     ASSERT_EQ(ZTR_OK, ztr_reserve(&s, 128));
-    ASSERT(ztr_capacity(&s) >= 128u);
+    ASSERT(ztr_capacity(&s) >= (size_t)128);
     /* Content and length unchanged. */
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -752,10 +752,10 @@ TEST reserve_sso_to_heap(void) {
     ASSERT(!ztr_p_is_heap(&s));
     ASSERT_EQ(ZTR_OK, ztr_reserve(&s, 64));
     ASSERT(ztr_p_is_heap(&s));
-    ASSERT(ztr_capacity(&s) >= 64u);
+    ASSERT(ztr_capacity(&s) >= (size_t)64);
     /* Content must survive the transition. */
     ASSERT_STR_EQ("hi", ztr_cstr(&s));
-    ASSERT_EQ(2u, ztr_len(&s));
+    ASSERT_EQ((size_t)2, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -773,14 +773,14 @@ TEST shrink_to_fit_heap_to_sso(void) {
     ASSERT(ztr_p_is_heap(&s));
     ASSERT_EQ(ZTR_OK, ztr_assign(&s, "short")); /* 5 chars — fits in SSO */
     ASSERT(ztr_p_is_heap(&s));                  /* still on heap after assign */
-    ASSERT(ztr_capacity(&s) >= 256u);
+    ASSERT(ztr_capacity(&s) >= (size_t)256);
 
     ztr_shrink_to_fit(&s);
 
     /* Slack was large (>= 16), content fits in SSO → transition back. */
     ASSERT(!ztr_p_is_heap(&s));
     ASSERT_STR_EQ("short", ztr_cstr(&s));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -829,15 +829,15 @@ TEST shrink_to_fit_large_heap_content(void) {
     ASSERT_EQ(ZTR_OK, ztr_reserve(&s, 256));
     ASSERT_EQ(ZTR_OK, ztr_assign(&s, "12345678901234567890123456789012")); /* 32 chars */
     ASSERT(ztr_p_is_heap(&s));
-    ASSERT(ztr_capacity(&s) >= 256u);
+    ASSERT(ztr_capacity(&s) >= (size_t)256);
 
     ztr_shrink_to_fit(&s);
 
     /* Still on heap (len > SSO_CAP), content preserved, cap tighter. */
     ASSERT(ztr_p_is_heap(&s));
-    ASSERT_EQ(32u, ztr_len(&s));
+    ASSERT_EQ((size_t)32, ztr_len(&s));
     ASSERT_STR_EQ("12345678901234567890123456789012", ztr_cstr(&s));
-    ASSERT(ztr_capacity(&s) < 256u);
+    ASSERT(ztr_capacity(&s) < (size_t)256);
     ztr_free(&s);
     PASS();
 }

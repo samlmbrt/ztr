@@ -12,7 +12,7 @@ TEST trim_leading_and_trailing_spaces(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "   hello world   "));
     ztr_trim(&s);
     ASSERT_STR_EQ("hello world", ztr_cstr(&s));
-    ASSERT_EQ(11u, ztr_len(&s));
+    ASSERT_EQ((size_t)11, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -40,7 +40,7 @@ TEST trim_all_whitespace_characters(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, " \t\n\r\v\f"));
     ztr_trim(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -51,7 +51,7 @@ TEST trim_no_whitespace_is_noop(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ztr_trim(&s);
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -60,7 +60,7 @@ TEST trim_empty_string_is_noop(void) {
     ztr s;
     ztr_init(&s);
     ztr_trim(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -97,7 +97,7 @@ TEST trim_single_space(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, " "));
     ztr_trim(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -123,7 +123,7 @@ TEST trim_start_removes_only_leading(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "   hello   "));
     ztr_trim_start(&s);
     ASSERT_STR_EQ("hello   ", ztr_cstr(&s));
-    ASSERT_EQ(8u, ztr_len(&s));
+    ASSERT_EQ((size_t)8, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -141,7 +141,7 @@ TEST trim_start_all_whitespace(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "   "));
     ztr_trim_start(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -151,7 +151,7 @@ TEST trim_start_empty_string_is_noop(void) {
     ztr s;
     ztr_init(&s);
     ztr_trim_start(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -193,7 +193,7 @@ TEST trim_end_removes_only_trailing(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "   hello   "));
     ztr_trim_end(&s);
     ASSERT_STR_EQ("   hello", ztr_cstr(&s));
-    ASSERT_EQ(8u, ztr_len(&s));
+    ASSERT_EQ((size_t)8, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -211,7 +211,7 @@ TEST trim_end_all_whitespace(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "   "));
     ztr_trim_end(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -221,7 +221,7 @@ TEST trim_end_empty_string_is_noop(void) {
     ztr s;
     ztr_init(&s);
     ztr_trim_end(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -272,7 +272,7 @@ TEST to_upper_already_upper_is_noop(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "HELLO"));
     ztr_to_ascii_upper(&s);
     ASSERT_STR_EQ("HELLO", ztr_cstr(&s));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -294,7 +294,7 @@ TEST to_upper_non_ascii_bytes_untouched(void) {
     const char expect[] = {'A', 'B', '\xC0', '\xFF', 'C', '\0'};
     ASSERT_EQ(ZTR_OK, ztr_from(&s, input));
     ztr_to_ascii_upper(&s);
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_MEM_EQ(expect, ztr_cstr(&s), 5);
     ztr_free(&s);
     PASS();
@@ -313,7 +313,7 @@ TEST to_upper_empty_string_is_noop(void) {
     ztr s;
     ztr_init(&s);
     ztr_to_ascii_upper(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
     PASS();
@@ -369,7 +369,7 @@ TEST to_lower_already_lower_is_noop(void) {
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
     ztr_to_ascii_lower(&s);
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ztr_free(&s);
     PASS();
 }
@@ -389,7 +389,7 @@ TEST to_lower_non_ascii_bytes_untouched(void) {
     const char expect[] = {'a', 'b', '\xC0', '\xFF', 'c', '\0'};
     ASSERT_EQ(ZTR_OK, ztr_from(&s, input));
     ztr_to_ascii_lower(&s);
-    ASSERT_EQ(5u, ztr_len(&s));
+    ASSERT_EQ((size_t)5, ztr_len(&s));
     ASSERT_MEM_EQ(expect, ztr_cstr(&s), 5);
     ztr_free(&s);
     PASS();
@@ -408,7 +408,7 @@ TEST to_lower_empty_string_is_noop(void) {
     ztr s;
     ztr_init(&s);
     ztr_to_ascii_lower(&s);
-    ASSERT_EQ(0u, ztr_len(&s));
+    ASSERT_EQ((size_t)0, ztr_len(&s));
     ASSERT_STR_EQ("", ztr_cstr(&s));
     ztr_free(&s);
     PASS();

@@ -55,10 +55,10 @@ TEST eq_one_empty_one_nonempty(void) {
     PASS();
 }
 
-TEST eq_sso_vs_heap_same_content(void) {
-    /* Force a heap allocation by building a string longer than ZTR_SSO_CAP,
-     * then compare against a fresh copy that may also be on the heap.
-     * The point is that both represent the same logical string. */
+TEST eq_both_heap_same_content(void) {
+    /* Both strings are heap-allocated (longer than ZTR_SSO_CAP).
+     * Verify that two distinct heap strings with identical content
+     * compare equal. */
     const char *long_str = "this string is definitely longer than the sso buffer";
     ztr a, b;
     ASSERT_EQ(ZTR_OK, ztr_from(&a, long_str));
@@ -443,7 +443,7 @@ SUITE(comparison) {
     RUN_TEST(eq_different_lengths);
     RUN_TEST(eq_both_empty);
     RUN_TEST(eq_one_empty_one_nonempty);
-    RUN_TEST(eq_sso_vs_heap_same_content);
+    RUN_TEST(eq_both_heap_same_content);
     RUN_TEST(eq_short_vs_long_same_prefix);
     RUN_TEST(eq_self_reference);
 

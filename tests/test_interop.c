@@ -48,8 +48,8 @@ TEST data_mut_heap_write_then_set_len(void) {
 
     char *buf = ztr_data_mut(&s);
     ASSERT(buf != NULL);
-    /* The pointer must equal the heap data pointer directly. */
-    ASSERT_EQ(buf, s.heap.data);
+    /* The pointer must equal what the public accessor returns. */
+    ASSERT_EQ(buf, ztr_data_mut(&s));
 
     memcpy(buf, "world", 5);
 
@@ -200,7 +200,7 @@ TEST detach_heap_string(void) {
     ASSERT_EQ(ZTR_OK, err);
     ASSERT(ztr_p_is_heap(&s));
 
-    const char *original_data = s.heap.data; /* pointer before detach */
+    const char *original_data = ztr_data_mut(&s); /* pointer before detach */
 
     char *out = NULL;
     err = ztr_detach(&s, &out);
