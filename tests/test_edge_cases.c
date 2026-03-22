@@ -1,12 +1,9 @@
 #include "greatest.h"
 #include "ztr.h"
 
-#include <stdint.h>
 #include <string.h>
 
-/* ---------------------------------------------------------------------------
- * NULL argument safety
- * ------------------------------------------------------------------------- */
+/* ---- NULL argument safety ---- */
 
 /* ztr_free(NULL) must be a safe no-op — it must not crash or invoke UB. */
 TEST free_null_is_safe(void) {
@@ -14,9 +11,7 @@ TEST free_null_is_safe(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * Double-free safety
- * ------------------------------------------------------------------------- */
+/* ---- Double-free safety ---- */
 
 /* Calling ztr_free twice on the same ztr must be safe.  The implementation
  * zeros the struct on the first call so the second call sees an SSO/empty
@@ -45,9 +40,7 @@ TEST double_free_heap_is_safe(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * Self-referential append
- * ------------------------------------------------------------------------- */
+/* ---- Self-referential append ---- */
 
 /* ztr_append(&s, ztr_cstr(&s)) must double the content correctly even if a
  * reallocation occurs during the call. */
@@ -95,9 +88,7 @@ TEST self_append_empty_stays_empty(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * Self-referential assign
- * ------------------------------------------------------------------------- */
+/* ---- Self-referential assign ---- */
 
 /* ztr_assign(&s, ztr_cstr(&s)) must be a no-op: the string keeps its exact
  * content and the call succeeds. */
@@ -132,9 +123,7 @@ TEST self_assign_heap_is_noop(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * SSO boundary
- * ------------------------------------------------------------------------- */
+/* ---- SSO boundary ---- */
 
 /* A string of exactly ZTR_SSO_CAP bytes must stay in SSO storage. */
 TEST sso_boundary_exact_sso_cap_stays_sso(void) {
@@ -224,9 +213,7 @@ TEST sso_boundary_from_buf_at_boundary(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * SSO → heap transition during append
- * ------------------------------------------------------------------------- */
+/* ---- SSO → heap transition during append ---- */
 
 /* Start with a 1-byte SSO string and append one byte at a time until the
  * string transitions from SSO to heap.  Verify that transition happens at
@@ -266,9 +253,7 @@ TEST sso_to_heap_transition_via_append(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * Empty string operations
- * ------------------------------------------------------------------------- */
+/* ---- Empty string operations ---- */
 
 /* ztr_find on an empty string must return ZTR_NPOS for a non-empty needle
  * and return 0 (start) for an empty needle when start == 0. */
@@ -347,9 +332,7 @@ TEST search_predicates_on_empty_string(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * ztr_is_ascii
- * ------------------------------------------------------------------------- */
+/* ---- ztr_is_ascii ---- */
 
 /* A pure ASCII string (all bytes 0x00–0x7F) must return true. */
 TEST is_ascii_pure_ascii_string(void) {
@@ -426,9 +409,7 @@ TEST is_ascii_high_byte_at_end_heap_string(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * ztr_from_buf with len close to ZTR_MAX_LEN (overflow)
- * ------------------------------------------------------------------------- */
+/* ---- ztr_from_buf with len close to ZTR_MAX_LEN (overflow) ---- */
 
 /* from_buf with len == ZTR_MAX_LEN + 1 must return ZTR_ERR_OVERFLOW without
  * allocating or modifying the output ztr. */
@@ -467,9 +448,7 @@ TEST set_len_size_t_max_overflow(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * Additional boundary and correctness checks
- * ------------------------------------------------------------------------- */
+/* ---- Additional boundary and correctness checks ---- */
 
 /* Appending to a string that is exactly at ZTR_SSO_CAP must succeed and
  * produce the correct heap string. */
@@ -611,9 +590,7 @@ TEST cstr_always_null_terminated(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * ztr_substr
- * ------------------------------------------------------------------------- */
+/* ---- ztr_substr ---- */
 
 /* Basic substring from the middle of a string. */
 TEST substr_from_middle(void) {
@@ -692,9 +669,7 @@ TEST substr_empty_source(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * Suite
- * ------------------------------------------------------------------------- */
+/* ---- Suite ---- */
 
 SUITE(edge_cases) {
     /* NULL safety */

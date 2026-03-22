@@ -1,9 +1,9 @@
 #include "greatest.h"
 #include "ztr.h"
 
-/* ------------------------------------------------------------------ */
-/* ztr_find                                                             */
-/* ------------------------------------------------------------------ */
+#include <string.h>
+
+/* ---- ztr_find ---- */
 
 TEST find_needle_present(void) {
     ztr s;
@@ -116,9 +116,7 @@ TEST find_needle_is_entire_string(void) {
     PASS();
 }
 
-/* ------------------------------------------------------------------ */
-/* ztr_rfind                                                            */
-/* ------------------------------------------------------------------ */
+/* ---- ztr_rfind ---- */
 
 TEST rfind_finds_last_occurrence(void) {
     /* "abab" — last "ab" is at index 2. */
@@ -190,9 +188,7 @@ TEST rfind_needle_longer_than_haystack(void) {
     PASS();
 }
 
-/* ------------------------------------------------------------------ */
-/* ztr_contains                                                         */
-/* ------------------------------------------------------------------ */
+/* ---- ztr_contains ---- */
 
 TEST contains_true(void) {
     ztr s;
@@ -250,9 +246,7 @@ TEST contains_needle_longer_than_string(void) {
     PASS();
 }
 
-/* ------------------------------------------------------------------ */
-/* ztr_starts_with                                                      */
-/* ------------------------------------------------------------------ */
+/* ---- ztr_starts_with ---- */
 
 TEST starts_with_yes(void) {
     ztr s;
@@ -318,9 +312,7 @@ TEST starts_with_single_char_no(void) {
     PASS();
 }
 
-/* ------------------------------------------------------------------ */
-/* ztr_ends_with                                                        */
-/* ------------------------------------------------------------------ */
+/* ---- ztr_ends_with ---- */
 
 TEST ends_with_yes(void) {
     ztr s;
@@ -386,9 +378,7 @@ TEST ends_with_single_char_no(void) {
     PASS();
 }
 
-/* ------------------------------------------------------------------ */
-/* ztr_count                                                            */
-/* ------------------------------------------------------------------ */
+/* ---- ztr_count ---- */
 
 TEST count_zero_occurrences(void) {
     ztr s;
@@ -476,9 +466,7 @@ TEST count_adjacent_non_overlapping(void) {
     PASS();
 }
 
-/* ------------------------------------------------------------------ */
-/* Suite                                                                */
-/* ------------------------------------------------------------------ */
+/* ---- Suite ---- */
 
 SUITE(search) {
     /* ztr_find */

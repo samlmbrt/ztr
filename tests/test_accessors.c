@@ -1,18 +1,11 @@
 #include "greatest.h"
 #include "ztr.h"
 
-#include <stddef.h>
 #include <string.h>
 
-/* ---- Helper constants ---- */
+#include "test_helpers.h"
 
-#define SSO_STR "123456789012345"   /* exactly ZTR_SSO_CAP (15) chars */
-#define HEAP_STR "1234567890123456" /* 16 chars — one past SSO cap */
-#define LONG_STR "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@"
-
-/* ======================================================================
- * ztr_len
- * ====================================================================== */
+/* ---- ztr_len ---- */
 
 TEST len_of_empty_string_is_zero(void) {
     ztr s;
@@ -98,9 +91,7 @@ TEST len_matches_strlen_for_ascii(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_cstr
- * ====================================================================== */
+/* ---- ztr_cstr ---- */
 
 TEST cstr_of_empty_string_is_empty_literal(void) {
     ztr s;
@@ -181,9 +172,7 @@ TEST cstr_stable_after_sso_to_heap_growth(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_is_empty
- * ====================================================================== */
+/* ---- ztr_is_empty ---- */
 
 TEST is_empty_true_for_init(void) {
     ztr s;
@@ -256,9 +245,7 @@ TEST is_empty_consistent_with_len(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_capacity
- * ====================================================================== */
+/* ---- ztr_capacity ---- */
 
 TEST capacity_of_init_is_sso_cap(void) {
     ztr s;
@@ -336,9 +323,7 @@ TEST capacity_does_not_decrease_after_assign_shorter(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_at
- * ====================================================================== */
+/* ---- ztr_at ---- */
 
 TEST at_first_char_sso(void) {
     ztr s;
@@ -428,9 +413,7 @@ TEST at_size_t_max_oob(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_err_str
- * ====================================================================== */
+/* ---- ztr_err_str ---- */
 
 TEST err_str_ok_is_non_null(void) {
     ASSERT(ztr_err_str(ZTR_OK) != NULL);
@@ -508,9 +491,7 @@ TEST err_str_codes_are_distinct(void) {
     PASS();
 }
 
-/* ======================================================================
- * Suite registration
- * ====================================================================== */
+/* ---- Suite registration ---- */
 
 SUITE(accessors) {
     /* ztr_len */

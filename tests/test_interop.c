@@ -3,9 +3,7 @@
 
 #include <string.h>
 
-/* ---------------------------------------------------------------------------
- * ztr_data_mut
- * ------------------------------------------------------------------------- */
+/* ---- ztr_data_mut ---- */
 
 /* ztr_data_mut on an SSO string returns a pointer into the inline buffer.
  * Writing through it then calling ztr_set_len should produce the right
@@ -63,9 +61,7 @@ TEST data_mut_heap_write_then_set_len(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * ztr_set_len
- * ------------------------------------------------------------------------- */
+/* ---- ztr_set_len ---- */
 
 /* Setting a valid shorter length truncates logically but keeps bytes intact
  * up to the new null terminator. */
@@ -188,9 +184,7 @@ TEST set_len_null_terminates(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * ztr_detach
- * ------------------------------------------------------------------------- */
+/* ---- ztr_detach ---- */
 
 /* Detaching a heap string transfers ownership of the heap pointer.
  * After detach the ztr must be reset to an empty, valid state. */
@@ -268,9 +262,7 @@ TEST detach_empty_string(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * ztr_swap
- * ------------------------------------------------------------------------- */
+/* ---- ztr_swap ---- */
 
 /* Swapping two different strings exchanges both content and length. */
 TEST swap_two_different_strings(void) {
@@ -373,9 +365,7 @@ TEST swap_two_heap_strings(void) {
     PASS();
 }
 
-/* ---------------------------------------------------------------------------
- * Suite
- * ------------------------------------------------------------------------- */
+/* ---- Suite ---- */
 
 SUITE(interop) {
     /* ztr_data_mut */

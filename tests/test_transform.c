@@ -1,11 +1,11 @@
 #include "greatest.h"
 #include "ztr.h"
 
+#include <string.h>
+
 /* ztr_p_is_ascii_space matches: ' ', '\t', '\n', '\r', '\v', '\f' */
 
-/* ================================================================
- * ztr_trim
- * ================================================================ */
+/* ---- ztr_trim ---- */
 
 TEST trim_leading_and_trailing_spaces(void) {
     ztr s;
@@ -114,9 +114,7 @@ TEST trim_heap_string(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_trim_start
- * ================================================================ */
+/* ---- ztr_trim_start ---- */
 
 TEST trim_start_removes_only_leading(void) {
     ztr s;
@@ -184,9 +182,7 @@ TEST trim_start_single_leading_space(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_trim_end
- * ================================================================ */
+/* ---- ztr_trim_end ---- */
 
 TEST trim_end_removes_only_trailing(void) {
     ztr s;
@@ -254,9 +250,7 @@ TEST trim_end_single_trailing_space(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_to_ascii_upper
- * ================================================================ */
+/* ---- ztr_to_ascii_upper ---- */
 
 TEST to_upper_lowercase_to_upper(void) {
     ztr s;
@@ -351,9 +345,7 @@ TEST to_upper_boundary_chars(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_to_ascii_lower
- * ================================================================ */
+/* ---- ztr_to_ascii_lower ---- */
 
 TEST to_lower_uppercase_to_lower(void) {
     ztr s;
@@ -459,9 +451,7 @@ TEST to_lower_roundtrip_with_upper(void) {
     PASS();
 }
 
-/* ================================================================
- * Suite
- * ================================================================ */
+/* ---- Suite ---- */
 
 SUITE(transform) {
     /* ztr_trim */

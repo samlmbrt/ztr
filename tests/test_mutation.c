@@ -1,6 +1,8 @@
 #include "greatest.h"
 #include "ztr.h"
 
+#include <string.h>
+
 /* ZTR_SSO_CAP is 15 on 64-bit platforms:
  *   sizeof(char*) + sizeof(size_t) - 1  =  8 + 8 - 1  = 15
  *
@@ -9,9 +11,7 @@
  * SSO-to-heap transition the capacity is >= 64.
  */
 
-/* ================================================================
- * ztr_append
- * ================================================================ */
+/* ---- ztr_append ---- */
 
 TEST append_basic(void) {
     ztr s;
@@ -84,9 +84,7 @@ TEST append_sso_to_heap_transition(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_append_buf
- * ================================================================ */
+/* ---- ztr_append_buf ---- */
 
 TEST append_buf_basic(void) {
     ztr s;
@@ -125,9 +123,7 @@ TEST append_buf_with_embedded_null(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_append_ztr
- * ================================================================ */
+/* ---- ztr_append_ztr ---- */
 
 TEST append_ztr_basic(void) {
     ztr s, t;
@@ -174,9 +170,7 @@ TEST append_ztr_to_empty(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_append_byte
- * ================================================================ */
+/* ---- ztr_append_byte ---- */
 
 TEST append_byte_basic(void) {
     ztr s;
@@ -218,9 +212,7 @@ TEST append_byte_to_empty(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_append_fmt
- * ================================================================ */
+/* ---- ztr_append_fmt ---- */
 
 #ifndef ZTR_NO_FMT
 
@@ -269,9 +261,7 @@ TEST append_fmt_forces_heap(void) {
 
 #endif /* ZTR_NO_FMT */
 
-/* ================================================================
- * ztr_insert
- * ================================================================ */
+/* ---- ztr_insert ---- */
 
 TEST insert_at_beginning(void) {
     ztr s;
@@ -323,9 +313,7 @@ TEST insert_self_referential(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_insert_buf
- * ================================================================ */
+/* ---- ztr_insert_buf ---- */
 
 TEST insert_buf_basic(void) {
     ztr s;
@@ -367,9 +355,7 @@ TEST insert_buf_at_pos_equal_to_len(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_erase
- * ================================================================ */
+/* ---- ztr_erase ---- */
 
 TEST erase_from_start(void) {
     ztr s;
@@ -454,9 +440,7 @@ TEST erase_null_terminator_maintained(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_replace_first
- * ================================================================ */
+/* ---- ztr_replace_first ---- */
 
 TEST replace_first_found(void) {
     ztr s;
@@ -526,9 +510,7 @@ TEST replace_first_only_replaces_first_occurrence(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_replace_all
- * ================================================================ */
+/* ---- ztr_replace_all ---- */
 
 TEST replace_all_multiple_occurrences(void) {
     ztr s;
@@ -616,9 +598,7 @@ TEST replace_all_with_empty_replacement(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_clear
- * ================================================================ */
+/* ---- ztr_clear ---- */
 
 TEST clear_sso_string(void) {
     ztr s;
@@ -658,9 +638,7 @@ TEST clear_already_empty(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_truncate
- * ================================================================ */
+/* ---- ztr_truncate ---- */
 
 TEST truncate_shorter(void) {
     ztr s;
@@ -717,9 +695,7 @@ TEST truncate_heap_string(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_reserve
- * ================================================================ */
+/* ---- ztr_reserve ---- */
 
 TEST reserve_grow(void) {
     ztr s;
@@ -760,9 +736,7 @@ TEST reserve_sso_to_heap(void) {
     PASS();
 }
 
-/* ================================================================
- * ztr_shrink_to_fit
- * ================================================================ */
+/* ---- ztr_shrink_to_fit ---- */
 
 TEST shrink_to_fit_heap_to_sso(void) {
     /* Reserve a large capacity, then truncate content to <= SSO_CAP.
@@ -842,9 +816,7 @@ TEST shrink_to_fit_large_heap_content(void) {
     PASS();
 }
 
-/* ================================================================
- * Suite
- * ================================================================ */
+/* ---- Suite ---- */
 
 SUITE(mutation) {
     /* ztr_append */

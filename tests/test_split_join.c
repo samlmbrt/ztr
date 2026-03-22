@@ -1,9 +1,9 @@
 #include "greatest.h"
 #include "ztr.h"
 
-/* =========================================================================
- * Helpers
- * ========================================================================= */
+#include <string.h>
+
+/* ---- Helpers ---- */
 
 /* Build a ztr from a C string literal for convenience. Caller must ztr_free. */
 static ztr make(const char *cstr) {
@@ -12,9 +12,7 @@ static ztr make(const char *cstr) {
     return s;
 }
 
-/* =========================================================================
- * ztr_split_begin / ztr_split_next
- * ========================================================================= */
+/* ---- ztr_split_begin / ztr_split_next ---- */
 
 TEST split_iter_basic(void) {
     ztr s = make("a,b,c");
@@ -241,9 +239,7 @@ TEST split_iter_repeated_calls_after_exhaustion(void) {
     PASS();
 }
 
-/* =========================================================================
- * ztr_split_alloc
- * ========================================================================= */
+/* ---- ztr_split_alloc ---- */
 
 TEST split_alloc_basic(void) {
     ztr s = make("one,two,three");
@@ -389,9 +385,7 @@ TEST split_alloc_max_parts_one(void) {
     PASS();
 }
 
-/* =========================================================================
- * ztr_join
- * ========================================================================= */
+/* ---- ztr_join ---- */
 
 TEST join_basic(void) {
     ztr parts[3];
@@ -524,9 +518,7 @@ TEST join_multi_char_separator(void) {
     PASS();
 }
 
-/* =========================================================================
- * ztr_join_cstr
- * ========================================================================= */
+/* ---- ztr_join_cstr ---- */
 
 TEST join_cstr_basic(void) {
     const char *parts[] = {"alpha", "beta", "gamma"};
@@ -623,9 +615,7 @@ TEST join_cstr_multi_char_separator(void) {
     PASS();
 }
 
-/* =========================================================================
- * Round-trip: split then join
- * ========================================================================= */
+/* ---- Round-trip: split then join ---- */
 
 TEST split_alloc_then_join_roundtrip(void) {
     const char *original = "red,green,blue";
@@ -647,9 +637,7 @@ TEST split_alloc_then_join_roundtrip(void) {
     PASS();
 }
 
-/* =========================================================================
- * Suite
- * ========================================================================= */
+/* ---- Suite ---- */
 
 SUITE(split_join) {
     /* ztr_split_begin / ztr_split_next */

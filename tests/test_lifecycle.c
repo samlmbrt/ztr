@@ -1,21 +1,11 @@
 #include "greatest.h"
 #include "ztr.h"
 
-#include <stddef.h>
 #include <string.h>
 
-/* ---- Helper constants ---- */
+#include "test_helpers.h"
 
-/* Exactly ZTR_SSO_CAP (15) characters — fits inline. */
-#define SSO_STR "123456789012345"
-/* One character past the SSO boundary — goes to heap. */
-#define HEAP_STR "1234567890123456"
-/* A much longer string well above the SSO cap. */
-#define LONG_STR "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@"
-
-/* ======================================================================
- * ztr_init
- * ====================================================================== */
+/* ---- ztr_init ---- */
 
 TEST init_produces_empty_string(void) {
     ztr s;
@@ -31,9 +21,7 @@ TEST init_produces_empty_string(void) {
     PASS();
 }
 
-/* ======================================================================
- * Zero-initialised struct is a valid empty string
- * ====================================================================== */
+/* ---- Zero-initialised struct is a valid empty string ---- */
 
 TEST zero_init_is_valid_empty_string(void) {
     ztr s = {0};
@@ -45,9 +33,7 @@ TEST zero_init_is_valid_empty_string(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_from
- * ====================================================================== */
+/* ---- ztr_from ---- */
 
 TEST from_null_produces_empty_string(void) {
     ztr s;
@@ -173,9 +159,7 @@ TEST from_result_is_null_terminated(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_from_buf
- * ====================================================================== */
+/* ---- ztr_from_buf ---- */
 
 TEST from_buf_with_explicit_length(void) {
     const char *src = "hello world";
@@ -268,9 +252,7 @@ TEST from_buf_embedded_nulls_heap(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_with_cap
- * ====================================================================== */
+/* ---- ztr_with_cap ---- */
 
 TEST with_cap_zero(void) {
     ztr s;
@@ -320,9 +302,7 @@ TEST with_cap_string_is_null_terminated(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_clone
- * ====================================================================== */
+/* ---- ztr_clone ---- */
 
 TEST clone_sso_string(void) {
     ztr src, dst;
@@ -399,9 +379,7 @@ TEST clone_long_string(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_assign
- * ====================================================================== */
+/* ---- ztr_assign ---- */
 
 TEST assign_sso_over_sso(void) {
     ztr s;
@@ -491,9 +469,7 @@ TEST assign_empty_string(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_assign_buf
- * ====================================================================== */
+/* ---- ztr_assign_buf ---- */
 
 TEST assign_buf_basic(void) {
     ztr s;
@@ -568,9 +544,7 @@ TEST assign_buf_grows_from_sso_to_heap(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_move
- * ====================================================================== */
+/* ---- ztr_move ---- */
 
 TEST move_sso_string(void) {
     ztr src, dst;
@@ -633,9 +607,7 @@ TEST move_overwrites_existing_dst(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_free
- * ====================================================================== */
+/* ---- ztr_free ---- */
 
 TEST free_heap_string(void) {
     ztr s;
@@ -680,9 +652,7 @@ TEST free_sso_double_free_is_safe(void) {
     PASS();
 }
 
-/* ======================================================================
- * ztr_fmt
- * ====================================================================== */
+/* ---- ztr_fmt ---- */
 
 #ifndef ZTR_NO_FMT
 
@@ -777,9 +747,7 @@ TEST fmt_overwrites_previous_content(void) {
 
 #endif /* ZTR_NO_FMT */
 
-/* ======================================================================
- * Suite registration
- * ====================================================================== */
+/* ---- Suite registration ---- */
 
 SUITE(lifecycle) {
     /* Zero / init */

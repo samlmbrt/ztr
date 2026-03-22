@@ -1,6 +1,8 @@
 #include "greatest.h"
 #include "ztr.h"
 
+#include <string.h>
+
 /*
  * UTF-8 byte sequences used throughout:
  *
@@ -13,9 +15,7 @@
  *   >U+10FFFF — 0xF4 0x90 0x80 0x80 encodes U+110000        (MUST be rejected)
  */
 
-/* =========================================================================
- * Helpers: build ztr from a raw byte buffer
- * ========================================================================= */
+/* ---- Helpers: build ztr from a raw byte buffer ---- */
 
 static ztr make_buf(const unsigned char *buf, size_t len) {
     ztr s;
@@ -29,9 +29,7 @@ static ztr make_str(const char *cstr) {
     return s;
 }
 
-/* =========================================================================
- * ztr_is_valid_utf8
- * ========================================================================= */
+/* ---- ztr_is_valid_utf8 ---- */
 
 TEST valid_utf8_ascii_string(void) {
     ztr s = make_str("hello");
@@ -156,9 +154,7 @@ TEST invalid_utf8_invalid_start_byte_fe(void) {
     PASS();
 }
 
-/* =========================================================================
- * ztr_utf8_len
- * ========================================================================= */
+/* ---- ztr_utf8_len ---- */
 
 TEST utf8_len_ascii(void) {
     ztr s = make_str("hello");
@@ -244,9 +240,7 @@ TEST utf8_len_string_with_all_widths(void) {
     PASS();
 }
 
-/* =========================================================================
- * ztr_utf8_next
- * ========================================================================= */
+/* ---- ztr_utf8_next ---- */
 
 TEST utf8_next_iterate_ascii(void) {
     ztr s = make_str("ABC");
@@ -425,9 +419,7 @@ TEST utf8_next_pos_beyond_len(void) {
     PASS();
 }
 
-/* =========================================================================
- * ztr_utf8_append
- * ========================================================================= */
+/* ---- ztr_utf8_append ---- */
 
 TEST utf8_append_ascii_codepoint(void) {
     ztr s;
@@ -610,9 +602,7 @@ TEST utf8_append_roundtrip_via_next(void) {
     PASS();
 }
 
-/* =========================================================================
- * Suite
- * ========================================================================= */
+/* ---- Suite ---- */
 
 SUITE(utf8) {
     /* ztr_is_valid_utf8 */
