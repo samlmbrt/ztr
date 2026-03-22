@@ -6,6 +6,12 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#if defined(__GNUC__) || defined(__clang__)
+#define ZTR_PRINTF_FMT(fmt_idx, arg_idx) __attribute__((format(printf, fmt_idx, arg_idx)))
+#else
+#define ZTR_PRINTF_FMT(fmt_idx, arg_idx)
+#endif
+
 /* --- Compile-time configuration --- */
 
 #ifndef ZTR_MALLOC
@@ -23,6 +29,10 @@
 #endif
 #ifndef ZTR_GROWTH_DEN
 #define ZTR_GROWTH_DEN 2
+#endif
+
+#ifndef ZTR_MIN_HEAP_CAP
+#define ZTR_MIN_HEAP_CAP 64
 #endif
 
 /* --- Constants --- */
@@ -94,7 +104,7 @@ void ztr_move(ztr *dst, ztr *src);
 void ztr_free(ztr *s);
 
 #ifndef ZTR_NO_FMT
-ztr_err ztr_fmt(ztr *s, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+ztr_err ztr_fmt(ztr *s, const char *fmt, ...) ZTR_PRINTF_FMT(2, 3);
 #endif
 
 /* --- Comparison --- */
@@ -131,7 +141,7 @@ ztr_err ztr_reserve(ztr *s, size_t cap);
 void ztr_shrink_to_fit(ztr *s);
 
 #ifndef ZTR_NO_FMT
-ztr_err ztr_append_fmt(ztr *s, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+ztr_err ztr_append_fmt(ztr *s, const char *fmt, ...) ZTR_PRINTF_FMT(2, 3);
 #endif
 
 /* --- Transformation (in-place) --- */

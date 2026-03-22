@@ -669,6 +669,28 @@ TEST substr_empty_source(void) {
     PASS();
 }
 
+/* ---- NULL buf with len > 0 ---- */
+
+TEST from_buf_null_buf_nonzero_len_returns_null_arg(void) {
+    ztr s;
+    ztr_init(&s);
+    ztr_err err = ztr_from_buf(&s, NULL, 5);
+    ASSERT_EQ(ZTR_ERR_NULL_ARG, err);
+    ztr_free(&s);
+    PASS();
+}
+
+TEST append_buf_null_buf_nonzero_len_returns_null_arg(void) {
+    ztr s;
+    ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
+    ztr_err err = ztr_append_buf(&s, NULL, 5);
+    ASSERT_EQ(ZTR_ERR_NULL_ARG, err);
+    /* String must be unchanged. */
+    ASSERT_STR_EQ("hello", ztr_cstr(&s));
+    ztr_free(&s);
+    PASS();
+}
+
 /* ---- Suite ---- */
 
 SUITE(edge_cases) {
@@ -725,6 +747,10 @@ SUITE(edge_cases) {
     RUN_TEST(truncate_to_same_length_is_noop);
     RUN_TEST(truncate_to_longer_is_noop);
     RUN_TEST(cstr_always_null_terminated);
+
+    /* NULL buf with len > 0 */
+    RUN_TEST(from_buf_null_buf_nonzero_len_returns_null_arg);
+    RUN_TEST(append_buf_null_buf_nonzero_len_returns_null_arg);
 
     /* ztr_substr */
     RUN_TEST(substr_from_middle);

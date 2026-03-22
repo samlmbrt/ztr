@@ -20,6 +20,9 @@ static const void *ztr_p_memmem(const void *haystack, size_t haystacklen, const 
     if (needlelen > haystacklen) {
         return NULL;
     }
+    if (needlelen == 1) {
+        return memchr(haystack, *(const unsigned char *)needle, haystacklen);
+    }
 
     const unsigned char *h = (const unsigned char *)haystack;
     const unsigned char *n = (const unsigned char *)needle;
@@ -59,8 +62,8 @@ static ztr_err ztr_p_grow(ztr *s, size_t new_cap) {
     if (grown < new_cap) {
         grown = new_cap;
     }
-    if (grown < 64) {
-        grown = 64;
+    if (grown < ZTR_MIN_HEAP_CAP) {
+        grown = ZTR_MIN_HEAP_CAP;
     }
     if (grown > ZTR_MAX_LEN) {
         grown = ZTR_MAX_LEN;
@@ -110,6 +113,14 @@ ztr_err ztr_from(ztr *s, const char *cstr) {
 ztr_err ztr_from_buf(ztr *s, const char *buf, size_t len) {
     if (len > ZTR_MAX_LEN) {
         return ZTR_ERR_OVERFLOW;
+    }
+
+    if (!buf) {
+        if (len == 0) {
+            ztr_init(s);
+            return ZTR_OK;
+        }
+        return ZTR_ERR_NULL_ARG;
     }
 
     ztr_init(s);
@@ -174,6 +185,10 @@ ztr_err ztr_assign(ztr *s, const char *cstr) {
 ztr_err ztr_assign_buf(ztr *s, const char *buf, size_t len) {
     if (len > ZTR_MAX_LEN) {
         return ZTR_ERR_OVERFLOW;
+    }
+
+    if (!buf) {
+        return len == 0 ? ZTR_OK : ZTR_ERR_NULL_ARG;
     }
 
     /* Handle self-referential input: buf might point into s's buffer. */
@@ -457,6 +472,10 @@ ztr_err ztr_append_buf(ztr *s, const char *buf, size_t len) {
         return ZTR_OK;
     }
 
+    if (!buf) {
+        return len == 0 ? ZTR_OK : ZTR_ERR_NULL_ARG;
+    }
+
     size_t cur_len = ztr_len(s);
 
     /* Overflow check. */
@@ -469,7 +488,7 @@ ztr_err ztr_append_buf(ztr *s, const char *buf, size_t len) {
     /* Handle self-referential input: buf might point into our buffer.
        If grow triggers realloc, buf would dangle. Record the offset instead. */
     const char *cur_data = ztr_p_buf(s);
-    bool self_ref = (buf >= cur_data && buf < cur_data + cur_len + 1);
+    bool self_ref = (buf >= cur_data && buf < cur_data + ztr_capacity(s) + 1);
     size_t self_offset = self_ref ? (size_t)(buf - cur_data) : 0;
 
     ztr_err err = ztr_p_grow(s, new_len);
@@ -509,6 +528,10 @@ ztr_err ztr_insert_buf(ztr *s, size_t pos, const char *buf, size_t len) {
         return ZTR_OK;
     }
 
+    if (!buf) {
+        return len == 0 ? ZTR_OK : ZTR_ERR_NULL_ARG;
+    }
+
     size_t cur_len = ztr_len(s);
     if (pos > cur_len) {
         return ZTR_ERR_OUT_OF_RANGE;
@@ -522,7 +545,7 @@ ztr_err ztr_insert_buf(ztr *s, size_t pos, const char *buf, size_t len) {
 
     /* Handle self-referential input: record offset before potential realloc. */
     const char *cur_data = ztr_p_buf(s);
-    bool self_ref = (buf >= cur_data && buf < cur_data + cur_len + 1);
+    bool self_ref = (buf >= cur_data && buf < cur_data + ztr_capacity(s) + 1);
     size_t self_offset = self_ref ? (size_t)(buf - cur_data) : 0;
 
     ztr_err err = ztr_p_grow(s, new_len);
@@ -588,7 +611,7 @@ ztr_err ztr_replace_first(ztr *s, const char *needle, const char *replacement) {
 
     size_t pos = ztr_find(s, needle, 0);
     if (pos == ZTR_NPOS) {
-        return ZTR_ERR_OUT_OF_RANGE;
+        return ZTR_OK;
     }
 
     size_t rlen = strlen(replacement);
@@ -597,7 +620,7 @@ ztr_err ztr_replace_first(ztr *s, const char *needle, const char *replacement) {
     /* Snapshot replacement if it points into our buffer (may be invalidated by grow). */
     const char *cur_data = ztr_p_buf(s);
     char *rep_copy = NULL;
-    if (replacement >= cur_data && replacement < cur_data + cur_len + 1) {
+    if (replacement >= cur_data && replacement < cur_data + ztr_capacity(s) + 1) {
         rep_copy = (char *)ZTR_MALLOC(rlen + 1);
         if (!rep_copy) {
             return ZTR_ERR_ALLOC;
@@ -625,11 +648,12 @@ ztr_err ztr_replace_first(ztr *s, const char *needle, const char *replacement) {
     }
 
     /* Replacement is longer — need to grow. */
-    size_t new_len = cur_len - nlen + rlen;
-    if (new_len > ZTR_MAX_LEN) {
+    size_t growth = rlen - nlen; /* safe: rlen > nlen guaranteed by the if branch above */
+    if (growth > ZTR_MAX_LEN - cur_len) {
         ZTR_FREE(rep_copy);
         return ZTR_ERR_OVERFLOW;
     }
+    size_t new_len = cur_len + growth;
 
     ztr_err err = ztr_p_grow(s, new_len);
     if (err) {
@@ -888,6 +912,20 @@ void ztr_to_ascii_lower(ztr *s) {
 /* ---- Extraction ---- */
 
 ztr_err ztr_substr(ztr *out, const ztr *s, size_t pos, size_t count) {
+    if (out == (ztr *)s) {
+        size_t slen = ztr_len(s);
+        if (pos >= slen) {
+            ztr_clear((ztr *)s);
+            return ZTR_OK;
+        }
+        if (count > slen - pos) {
+            count = slen - pos;
+        }
+        ztr_erase((ztr *)s, pos + count, slen - pos - count);
+        ztr_erase((ztr *)s, 0, pos);
+        return ZTR_OK;
+    }
+
     size_t slen = ztr_len(s);
     if (pos >= slen) {
         ztr_init(out);
@@ -959,6 +997,10 @@ ztr_err ztr_split_alloc(const ztr *s, const char *delim, ztr **parts, size_t *co
             /* Remaining goes into the last part. */
             break;
         }
+    }
+
+    if (n > SIZE_MAX / sizeof(ztr)) {
+        return ZTR_ERR_OVERFLOW;
     }
 
     ztr *arr = (ztr *)ZTR_MALLOC(n * sizeof(ztr));
@@ -1040,9 +1082,17 @@ ztr_err ztr_join(ztr *out, const ztr *parts, size_t count, const char *sep) {
     }
 
     for (size_t i = 0; i < count; i++) {
-        ztr_append_buf(out, ztr_cstr(&parts[i]), ztr_len(&parts[i]));
+        ztr_err err2 = ztr_append_buf(out, ztr_cstr(&parts[i]), ztr_len(&parts[i]));
+        if (err2) {
+            ztr_free(out);
+            return err2;
+        }
         if (i < count - 1 && sep_len > 0) {
-            ztr_append_buf(out, sep, sep_len);
+            err2 = ztr_append_buf(out, sep, sep_len);
+            if (err2) {
+                ztr_free(out);
+                return err2;
+            }
         }
     }
 
@@ -1079,10 +1129,18 @@ ztr_err ztr_join_cstr(ztr *out, const char *const *parts, size_t count, const ch
 
     for (size_t i = 0; i < count; i++) {
         if (parts[i]) {
-            ztr_append(out, parts[i]);
+            ztr_err err2 = ztr_append(out, parts[i]);
+            if (err2) {
+                ztr_free(out);
+                return err2;
+            }
         }
         if (i < count - 1 && sep_len > 0) {
-            ztr_append_buf(out, sep, sep_len);
+            ztr_err err2 = ztr_append_buf(out, sep, sep_len);
+            if (err2) {
+                ztr_free(out);
+                return err2;
+            }
         }
     }
 

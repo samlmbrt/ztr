@@ -454,7 +454,7 @@ TEST replace_first_found(void) {
 TEST replace_first_not_found(void) {
     ztr s;
     ASSERT_EQ(ZTR_OK, ztr_from(&s, "hello"));
-    ASSERT_EQ(ZTR_ERR_OUT_OF_RANGE, ztr_replace_first(&s, "xyz", "abc"));
+    ASSERT_EQ(ZTR_OK, ztr_replace_first(&s, "xyz", "abc"));
     /* String must be unchanged. */
     ASSERT_STR_EQ("hello", ztr_cstr(&s));
     ztr_free(&s);
