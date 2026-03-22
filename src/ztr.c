@@ -1,6 +1,5 @@
 #include "ztr.h"
 
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -10,6 +9,29 @@
 #endif
 
 /* ---- Internal helpers ---- */
+
+/* Portable memmem: find needle in haystack. Returns NULL if not found.
+   memmem is POSIX/GNU, not C11 — this fallback ensures portability. */
+static const void *ztr_p_memmem(const void *haystack, size_t haystacklen, const void *needle,
+                                size_t needlelen) {
+    if (needlelen == 0) {
+        return haystack;
+    }
+    if (needlelen > haystacklen) {
+        return NULL;
+    }
+
+    const unsigned char *h = (const unsigned char *)haystack;
+    const unsigned char *n = (const unsigned char *)needle;
+    size_t last = haystacklen - needlelen;
+
+    for (size_t i = 0; i <= last; i++) {
+        if (h[i] == n[0] && memcmp(h + i, n, needlelen) == 0) {
+            return h + i;
+        }
+    }
+    return NULL;
+}
 
 static inline void ztr_p_set_len_sso(ztr *s, size_t len) {
     s->len = len; /* High bit clear = SSO mode. */
@@ -351,7 +373,7 @@ size_t ztr_find(const ztr *s, const char *needle, size_t start) {
     }
 
     const char *haystack = ztr_cstr(s);
-    const char *found = (const char *)memmem(haystack + start, slen - start, needle, nlen);
+    const char *found = (const char *)ztr_p_memmem(haystack + start, slen - start, needle, nlen);
     if (!found) {
         return ZTR_NPOS;
     }
@@ -444,14 +466,11 @@ ztr_err ztr_append_buf(ztr *s, const char *buf, size_t len) {
 
     size_t new_len = cur_len + len;
 
-    /* Handle self-referential input: snapshot if buf points into our buffer. */
-    char snapshot_buf[sizeof(ztr)]; /* Large enough for any SSO content. */
+    /* Handle self-referential input: buf might point into our buffer.
+       If grow triggers realloc, buf would dangle. Record the offset instead. */
     const char *cur_data = ztr_p_buf(s);
-    if (buf >= cur_data && buf < cur_data + cur_len + 1) {
-        /* buf points into our buffer. Snapshot it before potential realloc. */
-        memcpy(snapshot_buf, buf, len);
-        buf = snapshot_buf;
-    }
+    bool self_ref = (buf >= cur_data && buf < cur_data + cur_len + 1);
+    size_t self_offset = self_ref ? (size_t)(buf - cur_data) : 0;
 
     ztr_err err = ztr_p_grow(s, new_len);
     if (err) {
@@ -459,7 +478,8 @@ ztr_err ztr_append_buf(ztr *s, const char *buf, size_t len) {
     }
 
     char *dst = ztr_p_buf(s);
-    memcpy(dst + cur_len, buf, len);
+    const char *src = self_ref ? dst + self_offset : buf;
+    memmove(dst + cur_len, src, len);
     dst[new_len] = '\0';
 
     if (ztr_p_is_heap(s)) {
@@ -500,13 +520,10 @@ ztr_err ztr_insert_buf(ztr *s, size_t pos, const char *buf, size_t len) {
 
     size_t new_len = cur_len + len;
 
-    /* Snapshot self-referential input. */
-    char snapshot_buf[sizeof(ztr)];
+    /* Handle self-referential input: record offset before potential realloc. */
     const char *cur_data = ztr_p_buf(s);
-    if (buf >= cur_data && buf < cur_data + cur_len + 1) {
-        memcpy(snapshot_buf, buf, len);
-        buf = snapshot_buf;
-    }
+    bool self_ref = (buf >= cur_data && buf < cur_data + cur_len + 1);
+    size_t self_offset = self_ref ? (size_t)(buf - cur_data) : 0;
 
     ztr_err err = ztr_p_grow(s, new_len);
     if (err) {
@@ -516,7 +533,13 @@ ztr_err ztr_insert_buf(ztr *s, size_t pos, const char *buf, size_t len) {
     char *dst = ztr_p_buf(s);
     /* Shift tail right to make room. */
     memmove(dst + pos + len, dst + pos, cur_len - pos + 1); /* +1 for null terminator */
-    memcpy(dst + pos, buf, len);
+    /* Source may have shifted due to the memmove above if self-referential. */
+    const char *src = self_ref ? dst + self_offset : buf;
+    /* If src is in the shifted region (at or after pos), it moved right by len. */
+    if (self_ref && self_offset >= pos) {
+        src += len;
+    }
+    memmove(dst + pos, src, len);
 
     if (ztr_p_is_heap(s)) {
         ztr_p_set_len_heap(s, new_len);
@@ -569,11 +592,23 @@ ztr_err ztr_replace_first(ztr *s, const char *needle, const char *replacement) {
     }
 
     size_t rlen = strlen(replacement);
+    size_t cur_len = ztr_len(s);
+
+    /* Snapshot replacement if it points into our buffer (may be invalidated by grow). */
+    const char *cur_data = ztr_p_buf(s);
+    char *rep_copy = NULL;
+    if (replacement >= cur_data && replacement < cur_data + cur_len + 1) {
+        rep_copy = (char *)ZTR_MALLOC(rlen + 1);
+        if (!rep_copy) {
+            return ZTR_ERR_ALLOC;
+        }
+        memcpy(rep_copy, replacement, rlen + 1);
+        replacement = rep_copy;
+    }
 
     if (rlen <= nlen) {
         /* Replacement fits in place — shrink or same size. */
         char *buf = ztr_p_buf(s);
-        size_t cur_len = ztr_len(s);
         memcpy(buf + pos, replacement, rlen);
         if (rlen < nlen) {
             size_t tail = cur_len - pos - nlen;
@@ -585,23 +620,24 @@ ztr_err ztr_replace_first(ztr *s, const char *needle, const char *replacement) {
                 ztr_p_set_len_sso(s, new_len);
             }
         }
+        ZTR_FREE(rep_copy);
         return ZTR_OK;
     }
 
-    /* Replacement is longer — need to grow. Erase then insert. */
-    size_t cur_len = ztr_len(s);
+    /* Replacement is longer — need to grow. */
     size_t new_len = cur_len - nlen + rlen;
     if (new_len > ZTR_MAX_LEN) {
+        ZTR_FREE(rep_copy);
         return ZTR_ERR_OVERFLOW;
     }
 
     ztr_err err = ztr_p_grow(s, new_len);
     if (err) {
+        ZTR_FREE(rep_copy);
         return err;
     }
 
     char *buf = ztr_p_buf(s);
-    /* Shift tail right. */
     size_t tail = cur_len - pos - nlen;
     memmove(buf + pos + rlen, buf + pos + nlen, tail + 1);
     memcpy(buf + pos, replacement, rlen);
@@ -612,6 +648,7 @@ ztr_err ztr_replace_first(ztr *s, const char *needle, const char *replacement) {
         ztr_p_set_len_sso(s, new_len);
     }
 
+    ZTR_FREE(rep_copy);
     return ZTR_OK;
 }
 
@@ -629,7 +666,7 @@ ztr_err ztr_replace_all(ztr *s, const char *needle, const char *replacement) {
     size_t occ_count = 0;
     size_t scan = 0;
     while (scan + nlen <= cur_len) {
-        const char *found = (const char *)memmem(src + scan, cur_len - scan, needle, nlen);
+        const char *found = (const char *)ztr_p_memmem(src + scan, cur_len - scan, needle, nlen);
         if (!found) {
             break;
         }
@@ -663,7 +700,8 @@ ztr_err ztr_replace_all(ztr *s, const char *needle, const char *replacement) {
     size_t read_pos = 0;
     size_t write_pos = 0;
     while (read_pos + nlen <= cur_len) {
-        const char *found = (const char *)memmem(src + read_pos, cur_len - read_pos, needle, nlen);
+        const char *found =
+            (const char *)ztr_p_memmem(src + read_pos, cur_len - read_pos, needle, nlen);
         if (!found) {
             break;
         }
@@ -889,7 +927,7 @@ bool ztr_split_next(ztr_split_iter *it, const char **part, size_t *part_len) {
     }
 
     const char *haystack = it->ztr_p_src + it->ztr_p_pos;
-    const char *found = (const char *)memmem(haystack, remaining, it->ztr_p_delim, dlen);
+    const char *found = (const char *)ztr_p_memmem(haystack, remaining, it->ztr_p_delim, dlen);
 
     if (!found) {
         /* No more delimiters — yield the rest. */
@@ -1124,15 +1162,21 @@ ztr_err ztr_utf8_len(size_t *out, const ztr *s) {
     while (i < len) {
         unsigned char b = data[i];
         size_t seq_len;
+        uint32_t cp;
 
         if (b <= 0x7F) {
-            seq_len = 1;
+            i++;
+            cp_count++;
+            continue;
         } else if ((b & 0xE0) == 0xC0) {
             seq_len = 2;
+            cp = b & 0x1F;
         } else if ((b & 0xF0) == 0xE0) {
             seq_len = 3;
+            cp = b & 0x0F;
         } else if ((b & 0xF8) == 0xF0) {
             seq_len = 4;
+            cp = b & 0x07;
         } else {
             return ZTR_ERR_INVALID_UTF8;
         }
@@ -1145,6 +1189,26 @@ ztr_err ztr_utf8_len(size_t *out, const ztr *s) {
             if ((data[i + j] & 0xC0) != 0x80) {
                 return ZTR_ERR_INVALID_UTF8;
             }
+            cp = (cp << 6) | (data[i + j] & 0x3F);
+        }
+
+        /* Reject overlong encodings. */
+        if (seq_len == 2 && cp < 0x80) {
+            return ZTR_ERR_INVALID_UTF8;
+        }
+        if (seq_len == 3 && cp < 0x800) {
+            return ZTR_ERR_INVALID_UTF8;
+        }
+        if (seq_len == 4 && cp < 0x10000) {
+            return ZTR_ERR_INVALID_UTF8;
+        }
+
+        /* Reject surrogates and out-of-range. */
+        if (cp >= 0xD800 && cp <= 0xDFFF) {
+            return ZTR_ERR_INVALID_UTF8;
+        }
+        if (cp > 0x10FFFF) {
+            return ZTR_ERR_INVALID_UTF8;
         }
 
         cp_count++;
