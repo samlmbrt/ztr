@@ -223,6 +223,8 @@ ztr_err ztr_assign(ztr *s, const char *cstr);
 ```c
 // Overwrite contents from a byte buffer with explicit length. Frees old content if needed.
 // Safe when buf points into s (self-assignment).
+// NULL buf with len == 0 clears the string (matches ztr_assign(s, NULL) behavior).
+// NULL buf with len > 0 returns ZTR_ERR_NULL_ARG.
 ztr_err ztr_assign_buf(ztr *s, const char *buf, size_t len);
 ```
 
