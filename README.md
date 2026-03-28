@@ -1,5 +1,8 @@
 # ztr
 
+[![CI](https://github.com/samlmbrt/ztr/actions/workflows/ci.yml/badge.svg)](https://github.com/samlmbrt/ztr/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A modern, ergonomic, and secure string library for C.
 
 `ztr` provides a mutable, owning string type with small string optimization (SSO), UTF-8 awareness, and safe-by-default error handling. It targets C11 and has no dependencies beyond the standard library.
