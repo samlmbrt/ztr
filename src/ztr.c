@@ -14,7 +14,9 @@
 /* ---- Internal helpers ---- */
 
 /* Portable memmem: find needle in haystack. Returns NULL if not found.
-   memmem is POSIX/GNU, not C11 — this fallback ensures portability. */
+   Uses memchr to skip to candidate positions (SIMD-accelerated on most
+   platforms), then memcmp to verify. This outperforms both naive byte-by-byte
+   scanning and some system memmem implementations (e.g., Apple's). */
 static const void *ztr_p_memmem(const void *haystack, size_t haystacklen, const void *needle,
                                 size_t needlelen) {
     if (needlelen == 0) {
@@ -31,10 +33,18 @@ static const void *ztr_p_memmem(const void *haystack, size_t haystacklen, const 
     const unsigned char *n = (const unsigned char *)needle;
     size_t last = haystacklen - needlelen;
 
-    for (size_t i = 0; i <= last; i++) {
-        if (h[i] == n[0] && memcmp(h + i, n, needlelen) == 0) {
-            return h + i;
+    /* Use memchr to jump to the next occurrence of the first byte,
+       then memcmp to check the full needle. This leverages the platform's
+       SIMD-optimized memchr to skip large regions of non-matching bytes. */
+    for (size_t i = 0; i <= last;) {
+        const unsigned char *found = (const unsigned char *)memchr(h + i, n[0], last - i + 1);
+        if (!found) {
+            return NULL;
         }
+        if (memcmp(found, n, needlelen) == 0) {
+            return found;
+        }
+        i = (size_t)(found - h) + 1;
     }
     return NULL;
 }
