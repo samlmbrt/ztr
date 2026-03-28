@@ -201,7 +201,11 @@ ztr_err ztr_assign_buf(ztr *s, const char *buf, size_t len) {
     }
 
     if (!buf) {
-        return len == 0 ? ZTR_OK : ZTR_ERR_NULL_ARG;
+        if (len == 0) {
+            ztr_free(s); /* Match ztr_assign(s, NULL) behavior: clear the string. */
+            return ZTR_OK;
+        }
+        return ZTR_ERR_NULL_ARG;
     }
 
     /* Handle self-referential input: buf might point into s's buffer. */
