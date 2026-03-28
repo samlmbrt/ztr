@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }}, ${{ matrix.cc }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cc: gcc
+          - os: ubuntu-latest
+            cc: clang
+          - os: macos-latest
+            cc: clang
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+        run: cmake --preset sanitize
+
+      - name: Build
+        run: cmake --build build/sanitize
+
+      - name: Test
+        run: cd build/sanitize && ctest --output-on-failure
+
+  valgrind:
+    name: Valgrind (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Valgrind
+        run: sudo apt-get update && sudo apt-get install -y valgrind
+
+      - name: Build (Debug)
+        run: |
+          cmake --preset debug
+          cmake --build build/debug
+
+      - name: Valgrind
+        run: valgrind --leak-check=full --error-exitcode=1 ./build/debug/ztr_tests
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install lcov
+        run: sudo apt-get update && sudo apt-get install -y lcov
+
+      - name: Build with coverage
+        run: |
+          cmake -B build/coverage -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="--coverage" -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+          cmake --build build/coverage
+
+      - name: Run tests
+        run: cd build/coverage && ctest --output-on-failure
+
+      - name: Generate coverage report
+        run: |
+          lcov --capture --directory build/coverage --output-file coverage.info \
+            --ignore-errors unsupported
+          lcov --remove coverage.info '*/tests/*' --output-file coverage.info \
+            --ignore-errors unsupported
+          lcov --list coverage.info
+
+      - name: Check coverage threshold
+        run: |
+          LINE_COV=$(lcov --summary coverage.info 2>&1 | grep 'lines' | grep -o '[0-9]*\.[0-9]*' | head -1)
+          echo "Line coverage: ${LINE_COV}%"
+          awk "BEGIN { exit ($LINE_COV < 90.0) ? 1 : 0 }"
