@@ -80,6 +80,12 @@ jobs:
 
       - name: Check coverage threshold
         run: |
-          LINE_COV=$(lcov --summary coverage.info 2>&1 | grep 'lines' | grep -o '[0-9]*\.[0-9]*' | head -1)
-          echo "Line coverage: ${LINE_COV}%"
-          awk "BEGIN { exit ($LINE_COV < 90.0) ? 1 : 0 }"
+          SUMMARY=$(lcov --summary coverage.info 2>&1)
+          echo "$SUMMARY"
+          LINE_COV=$(echo "$SUMMARY" | grep -i 'lines' | sed 's/[^0-9.]//g' | head -1)
+          echo "Parsed line coverage: ${LINE_COV}%"
+          if [ -z "$LINE_COV" ]; then
+            echo "ERROR: Could not parse line coverage"
+            exit 1
+          fi
+          awk "BEGIN { if ($LINE_COV < 90.0) exit 1; else exit 0 }"
