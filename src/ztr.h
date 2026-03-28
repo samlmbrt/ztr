@@ -132,7 +132,24 @@ size_t ztr_count(const ztr *s, const char *needle);
 ztr_err ztr_append(ztr *s, const char *cstr);
 ztr_err ztr_append_buf(ztr *s, const char *buf, size_t len);
 ztr_err ztr_append_ztr(ztr *s, const ztr *other);
-ztr_err ztr_append_byte(ztr *s, char c);
+
+/* Outlined slow path for append_byte when growth is needed. */
+ztr_err ztr_p_append_byte_slow(ztr *s, char c);
+
+/* Append a single byte. Inlined fast path: if capacity is sufficient,
+   write the byte directly and update the length. No self-ref check needed
+   (the address of a local char can never alias the internal buffer). */
+static inline ztr_err ztr_append_byte(ztr *s, char c) {
+    size_t len = ztr_len(s);
+    if (len < ztr_capacity(s)) {
+        char *buf = ztr_p_is_heap(s) ? s->heap.data : s->sso;
+        buf[len] = c;
+        buf[len + 1] = '\0';
+        s->len = (s->len & ZTR_HEAP_BIT) | (len + 1);
+        return ZTR_OK;
+    }
+    return ztr_p_append_byte_slow(s, c);
+}
 ztr_err ztr_insert(ztr *s, size_t pos, const char *cstr);
 ztr_err ztr_insert_buf(ztr *s, size_t pos, const char *buf, size_t len);
 void ztr_erase(ztr *s, size_t pos, size_t count);

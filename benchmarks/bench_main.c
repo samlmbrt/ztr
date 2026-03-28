@@ -205,6 +205,27 @@ static void bench_contains_miss(void) {
     ztr_free(&s);
 }
 
+static void bench_rfind(void) {
+    enum { N = 100000 };
+    ztr s = {0};
+    ztr_reserve(&s, 10240);
+    for (int i = 0; i < 1024; i++) {
+        ztr_append(&s, "abcdefghij");
+    }
+    /* Plant the needle near the start. */
+    ztr_insert(&s, 10, "NEEDLE");
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int i = 0; i < N; i++) {
+        size_t pos = ztr_rfind(&s, "NEEDLE", ZTR_NPOS);
+        do_not_optimize(&pos);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    report("rfind 6-byte needle in 10KB x100K", N, elapsed_ms(t0, t1));
+    ztr_free(&s);
+}
+
 /* ---- Replace benchmarks ---- */
 
 static void bench_replace_all(void) {
@@ -323,6 +344,7 @@ static const bench_entry benchmarks[] = {
     {"Search", NULL},
     {"  find (hit, 10KB) x100K", bench_find_short_needle},
     {"  contains (miss, 10KB) x100K", bench_contains_miss},
+    {"  rfind (hit, 10KB) x100K", bench_rfind},
 
     {"Replace", NULL},
     {"  replace_all (1K occ) x1K", bench_replace_all},

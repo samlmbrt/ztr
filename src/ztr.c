@@ -425,8 +425,22 @@ size_t ztr_rfind(const ztr *s, const char *needle, size_t start) {
         last_possible = start;
     }
 
+    /* Single-byte needle: scan backwards with direct byte comparison. */
+    if (nlen == 1) {
+        unsigned char target = (unsigned char)needle[0];
+        for (size_t i = last_possible + 1; i > 0; i--) {
+            if ((unsigned char)haystack[i - 1] == target) {
+                return i - 1;
+            }
+        }
+        return ZTR_NPOS;
+    }
+
+    /* Multi-byte: filter on first byte before calling memcmp. */
+    unsigned char first = (unsigned char)needle[0];
     for (size_t i = last_possible + 1; i > 0; i--) {
-        if (memcmp(haystack + i - 1, needle, nlen) == 0) {
+        if ((unsigned char)haystack[i - 1] == first &&
+            memcmp(haystack + i - 1, needle, nlen) == 0) {
             return i - 1;
         }
     }
@@ -534,7 +548,7 @@ ztr_err ztr_append_ztr(ztr *s, const ztr *other) {
     return ztr_append_buf(s, ztr_cstr(other), ztr_len(other));
 }
 
-ztr_err ztr_append_byte(ztr *s, char c) { return ztr_append_buf(s, &c, 1); }
+ztr_err ztr_p_append_byte_slow(ztr *s, char c) { return ztr_append_buf(s, &c, 1); }
 
 ztr_err ztr_insert_buf(ztr *s, size_t pos, const char *buf, size_t len) {
     if (len == 0) {
