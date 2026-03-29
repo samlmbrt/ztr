@@ -274,6 +274,187 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         ztr_free(&d); /* second free — must not crash */
     }
 
+    /* ---- String View ---- */
+
+    /* Build views from the same haystack/needle data. */
+    ztr_view vs = ztr_view_from_ztr(&s);
+    ztr_view vn = ztr_view_from_ztr(&needle);
+
+    /* Construction variants. */
+    {
+        ztr_view v1 = ztr_view_from_buf(hay_data, hay_len);
+        (void)ztr_view_len(v1);
+
+        ztr_view v2 = ztr_view_from_cstr(ztr_cstr(&s));
+        (void)ztr_view_data(v2);
+
+        ztr_view v3 = ztr_view_from_ztr(&s);
+        (void)ztr_view_is_empty(v3);
+
+        /* NULL construction. */
+        ztr_view v4 = ztr_view_from_cstr(NULL);
+        (void)ztr_view_len(v4);
+        ztr_view v5 = ztr_view_from_buf(NULL, 0);
+        (void)ztr_view_len(v5);
+        ztr_view v6 = ztr_view_from_ztr(NULL);
+        (void)ztr_view_len(v6);
+    }
+
+    /* Accessors. */
+    (void)ztr_view_len(vs);
+    (void)ztr_view_data(vs);
+    (void)ztr_view_is_empty(vs);
+    if (ztr_view_len(vs) > 0) {
+        (void)ztr_view_at(vs, 0);
+        (void)ztr_view_at(vs, ztr_view_len(vs) - 1);
+    }
+    (void)ztr_view_at(vs, ztr_view_len(vs)); /* OOB — should return '\0' */
+
+    /* Comparison. */
+    (void)ztr_view_eq(vs, vn);
+    (void)ztr_view_eq_cstr(vs, ztr_cstr(&needle));
+    (void)ztr_view_eq_cstr(vs, NULL);
+    (void)ztr_view_cmp(vs, vn);
+    (void)ztr_view_cmp_cstr(vs, ztr_cstr(&needle));
+    (void)ztr_view_cmp_cstr(vs, NULL);
+    (void)ztr_view_eq_ascii_nocase(vs, vn);
+    (void)ztr_view_eq_ascii_nocase_cstr(vs, ztr_cstr(&needle));
+    (void)ztr_view_eq_ascii_nocase_cstr(vs, NULL);
+
+    /* Search (view needle). */
+    (void)ztr_view_find(vs, vn, 0);
+    (void)ztr_view_rfind(vs, vn, ZTR_NPOS);
+    (void)ztr_view_contains(vs, vn);
+    (void)ztr_view_starts_with(vs, vn);
+    (void)ztr_view_ends_with(vs, vn);
+    (void)ztr_view_count(vs, vn);
+
+    /* Search with offset. */
+    if (ztr_view_len(vs) > 2) {
+        (void)ztr_view_find(vs, vn, ztr_view_len(vs) / 2);
+        (void)ztr_view_rfind(vs, vn, ztr_view_len(vs) / 2);
+    }
+
+    /* Search (empty needle). */
+    (void)ztr_view_find(vs, ZTR_VIEW_EMPTY, 0);
+    (void)ztr_view_contains(vs, ZTR_VIEW_EMPTY);
+
+    /* Search (cstr needle). */
+    (void)ztr_view_find_cstr(vs, ztr_cstr(&needle), 0);
+    (void)ztr_view_rfind_cstr(vs, ztr_cstr(&needle), ZTR_NPOS);
+    (void)ztr_view_contains_cstr(vs, ztr_cstr(&needle));
+    (void)ztr_view_starts_with_cstr(vs, ztr_cstr(&needle));
+    (void)ztr_view_ends_with_cstr(vs, ztr_cstr(&needle));
+    (void)ztr_view_count_cstr(vs, ztr_cstr(&needle));
+    (void)ztr_view_find_cstr(vs, NULL, 0);
+
+    /* Search (single character). */
+    if (needle_len > 0) {
+        (void)ztr_view_find_char(vs, needle_data[0], 0);
+        (void)ztr_view_rfind_char(vs, needle_data[0], ZTR_NPOS);
+        (void)ztr_view_contains_char(vs, needle_data[0]);
+    }
+    (void)ztr_view_find_char(vs, '\0', 0);
+    (void)ztr_view_contains_char(ZTR_VIEW_EMPTY, 'x');
+
+    /* Trimming. */
+    {
+        ztr_view t1 = ztr_view_trim(vs);
+        (void)ztr_view_len(t1);
+        ztr_view t2 = ztr_view_trim_start(vs);
+        (void)ztr_view_len(t2);
+        ztr_view t3 = ztr_view_trim_end(vs);
+        (void)ztr_view_len(t3);
+
+        /* Trim on empty/zero-init. */
+        ztr_view empty = {0};
+        (void)ztr_view_trim(empty);
+        (void)ztr_view_trim(ZTR_VIEW_EMPTY);
+    }
+
+    /* Substr and slice. */
+    if (ztr_view_len(vs) > 4) {
+        ztr_view sub = ztr_view_substr(vs, 1, ztr_view_len(vs) / 2);
+        (void)ztr_view_len(sub);
+    }
+    (void)ztr_view_substr(vs, 0, 0);
+    (void)ztr_view_substr(vs, ztr_view_len(vs), 5);        /* pos == len */
+    (void)ztr_view_substr(vs, ztr_view_len(vs) + 10, 5);   /* pos > len */
+    (void)ztr_view_substr(vs, 0, ZTR_NPOS);                /* count = SIZE_MAX */
+
+    if (ztr_view_len(vs) > 2) {
+        (void)ztr_view_remove_prefix(vs, 1);
+        (void)ztr_view_remove_suffix(vs, 1);
+    }
+    (void)ztr_view_remove_prefix(vs, ztr_view_len(vs));     /* exact */
+    (void)ztr_view_remove_suffix(vs, ztr_view_len(vs));     /* exact */
+    (void)ztr_view_remove_prefix(vs, ztr_view_len(vs) + 1); /* past end */
+    (void)ztr_view_remove_suffix(vs, ztr_view_len(vs) + 1); /* past end */
+
+    /* Split iterator. */
+    if (needle_len > 0 && needle_len <= 8) {
+        ztr_view_split_iter vit;
+        ztr_view_split_begin(&vit, vs, vn);
+        ztr_view token;
+        size_t vpart_count = 0;
+        while (ztr_view_split_next(&vit, &token)) {
+            (void)ztr_view_len(token);
+            vpart_count++;
+            if (vpart_count > 10000) {
+                break; /* Safety valve. */
+            }
+        }
+
+        /* cstr delimiter variant. */
+        ztr_view_split_begin_cstr(&vit, vs, ztr_cstr(&needle));
+        vpart_count = 0;
+        while (ztr_view_split_next(&vit, &token)) {
+            vpart_count++;
+            if (vpart_count > 10000) {
+                break;
+            }
+        }
+    }
+
+    /* Empty delimiter split. */
+    {
+        ztr_view_split_iter vit;
+        ztr_view_split_begin(&vit, vs, ZTR_VIEW_EMPTY);
+        ztr_view token;
+        (void)ztr_view_split_next(&vit, &token);
+    }
+
+    /* NULL delimiter via cstr. */
+    {
+        ztr_view_split_iter vit;
+        ztr_view_split_begin_cstr(&vit, vs, NULL);
+        ztr_view token;
+        (void)ztr_view_split_next(&vit, &token);
+    }
+
+    /* Utility. */
+    (void)ztr_view_is_ascii(vs);
+    (void)ztr_view_is_valid_utf8(vs);
+    (void)ztr_view_is_ascii(ZTR_VIEW_EMPTY);
+    (void)ztr_view_is_valid_utf8(ZTR_VIEW_EMPTY);
+
+    /* Interop — materialize view into owned ztr. */
+    {
+        ztr m;
+        ztr_init(&m);
+        ztr_from_view(&m, vs);
+        ztr_free(&m);
+    }
+
+    /* Self-referential: view into s, then from_view back into s. */
+    if (hay_len > 4) {
+        ztr self;
+        ztr_clone(&self, &s);
+        ztr_view sv = ztr_view_substr(ztr_view_from_ztr(&self), 1, hay_len / 2);
+        ztr_from_view(&self, sv);
+        ztr_free(&self);
+    }
+
     /* ---- Cleanup ---- */
 
     ztr_free(&needle);
