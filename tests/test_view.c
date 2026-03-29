@@ -698,6 +698,32 @@ TEST view_trim_mixed_whitespace(void) {
     PASS();
 }
 
+TEST view_trim_zero_init_view(void) {
+    /* A zero-init view has data=NULL, len=0. Trim must return ZTR_VIEW_EMPTY
+       (data != NULL), not propagate the NULL pointer. */
+    ztr_view v = {0};
+    ztr_view t = ztr_view_trim(v);
+    ASSERT_EQ((size_t)0, ztr_view_len(t));
+    ASSERT(ztr_view_data(t) != NULL);
+    PASS();
+}
+
+TEST view_trim_start_zero_init_view(void) {
+    ztr_view v = {0};
+    ztr_view t = ztr_view_trim_start(v);
+    ASSERT_EQ((size_t)0, ztr_view_len(t));
+    ASSERT(ztr_view_data(t) != NULL);
+    PASS();
+}
+
+TEST view_trim_end_zero_init_view(void) {
+    ztr_view v = {0};
+    ztr_view t = ztr_view_trim_end(v);
+    ASSERT_EQ((size_t)0, ztr_view_len(t));
+    ASSERT(ztr_view_data(t) != NULL);
+    PASS();
+}
+
 TEST view_trim_start_all_whitespace(void) {
     ztr_view v = ztr_view_from_cstr("   ");
     ztr_view t = ztr_view_trim_start(v);
@@ -1185,6 +1211,9 @@ SUITE(view) {
     RUN_TEST(view_trim_all_whitespace);
     RUN_TEST(view_trim_empty_view);
     RUN_TEST(view_trim_mixed_whitespace);
+    RUN_TEST(view_trim_zero_init_view);
+    RUN_TEST(view_trim_start_zero_init_view);
+    RUN_TEST(view_trim_end_zero_init_view);
     RUN_TEST(view_trim_start_all_whitespace);
     RUN_TEST(view_trim_start_empty);
     RUN_TEST(view_trim_end_all_whitespace);

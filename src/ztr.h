@@ -48,7 +48,8 @@
 
 /* Printf helpers for ztr (mirrors ZTR_VIEW_FMT/ZTR_VIEW_ARG below). */
 #define ZTR_FMT "%.*s"
-#define ZTR_ARG(s) (int)ztr_len(s), ztr_cstr(s)
+#define ZTR_ARG(s)                                                                                 \
+    (int)(ztr_len(s) > (size_t)INT_MAX ? (size_t)INT_MAX : ztr_len(s)), ztr_cstr(s)
 
 /* --- Data structure --- */
 
@@ -261,7 +262,8 @@ _Static_assert(sizeof(ztr_view) == sizeof(size_t) * 2, "unexpected ztr_view stru
 
 /* Printf helpers: printf("val=" ZTR_VIEW_FMT "\n", ZTR_VIEW_ARG(v)); */
 #define ZTR_VIEW_FMT "%.*s"
-#define ZTR_VIEW_ARG(v) (int)(v).len, (v).data
+#define ZTR_VIEW_ARG(v)                                                                            \
+    (int)((v).len > (size_t)INT_MAX ? (size_t)INT_MAX : (v).len), (v).data
 
 /* --- Construction (static inline, infallible) --- */
 

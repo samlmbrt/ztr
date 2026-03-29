@@ -1747,6 +1747,9 @@ bool ztr_view_contains_char(ztr_view v, char c) {
 /* ---- View: Trimming ---- */
 
 ztr_view ztr_view_trim_start(ztr_view v) {
+    if (v.len == 0) {
+        return ZTR_VIEW_EMPTY;
+    }
     size_t i = 0;
     while (i < v.len && ztr_p_is_ascii_space(v.data[i])) {
         i++;
@@ -1758,6 +1761,9 @@ ztr_view ztr_view_trim_start(ztr_view v) {
 }
 
 ztr_view ztr_view_trim_end(ztr_view v) {
+    if (v.len == 0) {
+        return ZTR_VIEW_EMPTY;
+    }
     size_t len = v.len;
     while (len > 0 && ztr_p_is_ascii_space(v.data[len - 1])) {
         len--;
