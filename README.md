@@ -184,7 +184,7 @@ ztr_view sep = ZTR_VIEW_LIT(",");
 ztr_view empty = ZTR_VIEW_EMPTY;
 ```
 
-See [docs/SPEC.md](docs/SPEC.md) for the complete API reference with signatures, preconditions, edge cases, and error behavior.
+See [docs/API.md](docs/API.md) for the complete API reference with signatures, preconditions, edge cases, and error behavior.
 
 ## Error handling
 
@@ -269,7 +269,7 @@ typedef struct ztr_view {
 
 ## Documentation
 
-- [docs/SPEC.md](docs/SPEC.md) — complete API specification (signatures, edge cases, guarantees)
+- [docs/API.md](docs/API.md) — complete API reference (signatures, edge cases, guarantees)
 - [docs/DESIGN_DISCUSSION.md](docs/DESIGN_DISCUSSION.md) — design panel record (rationale, alternatives considered, trade-offs)
 
 ## License

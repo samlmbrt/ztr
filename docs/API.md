@@ -1,4 +1,4 @@
-# ZTR v1.3 Specification
+# ZTR v1.3 API Reference
 
 ## 1. Overview
 
@@ -1009,4 +1009,4 @@ ztr_err ztr_from_view(ztr *s, ztr_view v);
 
 ---
 
-_This specification is the authoritative reference for implementing ztr._
+_This document is the authoritative API reference for ztr._

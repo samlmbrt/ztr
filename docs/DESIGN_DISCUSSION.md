@@ -263,7 +263,7 @@ The following embedded-focused features were discussed but deferred to a future 
 
 ## Round 3: Final Spec Review
 
-After the spec was written incorporating all Round 2 fixes, the panel reconvened for a final review. Each engineer was given the complete SPEC.md and asked to find any remaining issues.
+After the spec was written incorporating all Round 2 fixes, the panel reconvened for a final review. Each engineer was given the complete API.md and asked to find any remaining issues.
 
 ### Confidence Scores
 
@@ -386,4 +386,4 @@ Trade-off accepted: 15 bytes of SSO capacity covers single-word identifiers, sho
 
 ---
 
-*This document is the historical record of the design process. For the authoritative specification, see SPEC.md.*
+*This document is the historical record of the design process. For the authoritative specification, see API.md.*
