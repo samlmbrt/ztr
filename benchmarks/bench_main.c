@@ -325,6 +325,186 @@ static void bench_eq_same(void) {
     ztr_free(&b);
 }
 
+/* ---- View benchmarks ---- */
+
+static void bench_view_find_vs_ztr_find(void) {
+    enum { N = 100000 };
+    /* Build a 10KB haystack. */
+    ztr s = {0};
+    ztr_reserve(&s, 10240);
+    for (int i = 0; i < 1024; i++) {
+        ztr_append(&s, "abcdefghij");
+    }
+    ztr_append(&s, "NEEDLE");
+
+    ztr_view v = ztr_view_from_ztr(&s);
+    ztr_view needle = ZTR_VIEW_LIT("NEEDLE");
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int i = 0; i < N; i++) {
+        size_t pos = ztr_view_find(v, needle, 0);
+        do_not_optimize(&pos);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    report("view_find (hit, 10KB) x100K", N, elapsed_ms(t0, t1));
+    ztr_free(&s);
+}
+
+static void bench_view_find_char(void) {
+    enum { N = 100000 };
+    ztr s = {0};
+    ztr_reserve(&s, 10240);
+    for (int i = 0; i < 1024; i++) {
+        ztr_append(&s, "abcdefghij");
+    }
+    /* Plant a unique char near the end. */
+    ztr_append(&s, "Z");
+
+    ztr_view v = ztr_view_from_ztr(&s);
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int i = 0; i < N; i++) {
+        size_t pos = ztr_view_find_char(v, 'Z', 0);
+        do_not_optimize(&pos);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    report("view_find_char (hit, 10KB) x100K", N, elapsed_ms(t0, t1));
+    ztr_free(&s);
+}
+
+static void bench_view_starts_with(void) {
+    enum { N = 10000000 };
+    ztr_view v = ZTR_VIEW_LIT("Content-Type: application/json");
+    ztr_view prefix = ZTR_VIEW_LIT("Content-Type");
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int i = 0; i < N; i++) {
+        bool ok = ztr_view_starts_with(v, prefix);
+        do_not_optimize(&ok);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    report("view_starts_with (12B prefix) x10M", N, elapsed_ms(t0, t1));
+}
+
+static void bench_view_eq_cstr(void) {
+    enum { N = 10000000 };
+    ztr_view v = ZTR_VIEW_LIT("null");
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int i = 0; i < N; i++) {
+        bool ok = ztr_view_eq_cstr(v, "null");
+        do_not_optimize(&ok);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    report("view_eq_cstr (4B match) x10M", N, elapsed_ms(t0, t1));
+}
+
+static void bench_view_trim(void) {
+    enum { N = 10000000 };
+    ztr_view v = ZTR_VIEW_LIT("   hello world   ");
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int i = 0; i < N; i++) {
+        ztr_view t = ztr_view_trim(v);
+        do_not_optimize(&t);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    report("view_trim (18B, 3+3 ws) x10M", N, elapsed_ms(t0, t1));
+}
+
+static void bench_view_split_iter(void) {
+    enum { N = 10000 };
+    /* Build a CSV-like string with 1000 fields. */
+    ztr s = {0};
+    for (int i = 0; i < 1000; i++) {
+        if (i > 0) {
+            ztr_append_byte(&s, ',');
+        }
+        ztr_append(&s, "field");
+    }
+    ztr_view v = ztr_view_from_ztr(&s);
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int i = 0; i < N; i++) {
+        ztr_view_split_iter it;
+        ztr_view_split_begin(&it, v, ZTR_VIEW_LIT(","));
+        ztr_view token;
+        size_t count = 0;
+        while (ztr_view_split_next(&it, &token)) {
+            count++;
+        }
+        do_not_optimize(&count);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    report("view_split_iter (1K fields) x10K", N, elapsed_ms(t0, t1));
+    ztr_free(&s);
+}
+
+static void bench_view_is_ascii(void) {
+    enum { N = 10000 };
+    /* Build a 10KB all-ASCII string. */
+    ztr s = {0};
+    ztr_reserve(&s, 10240);
+    for (int i = 0; i < 1024; i++) {
+        ztr_append(&s, "abcdefghij");
+    }
+    ztr_view v = ztr_view_from_ztr(&s);
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int i = 0; i < N; i++) {
+        bool ok = ztr_view_is_ascii(v);
+        do_not_optimize(&ok);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    report("view_is_ascii (10KB) x10K", N, elapsed_ms(t0, t1));
+    ztr_free(&s);
+}
+
+static void bench_view_is_valid_utf8_ascii(void) {
+    enum { N = 10000 };
+    /* Build a 10KB all-ASCII string — exercises the fast-skip path. */
+    ztr s = {0};
+    ztr_reserve(&s, 10240);
+    for (int i = 0; i < 1024; i++) {
+        ztr_append(&s, "abcdefghij");
+    }
+    ztr_view v = ztr_view_from_ztr(&s);
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int i = 0; i < N; i++) {
+        bool ok = ztr_view_is_valid_utf8(v);
+        do_not_optimize(&ok);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    report("view_is_valid_utf8 (10KB ASCII) x10K", N, elapsed_ms(t0, t1));
+    ztr_free(&s);
+}
+
+static void bench_from_view(void) {
+    enum { N = 1000000 };
+    ztr_view v = ZTR_VIEW_LIT("hello");
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    for (int i = 0; i < N; i++) {
+        ztr s;
+        ztr_init(&s);
+        ztr_from_view(&s, v);
+        do_not_optimize(&s);
+        ztr_free(&s);
+    }
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    report("from_view+free (SSO, 5B) x1M", N, elapsed_ms(t0, t1));
+}
+
 /* ---- Main ---- */
 
 static const bench_entry benchmarks[] = {
@@ -357,6 +537,17 @@ static const bench_entry benchmarks[] = {
 
     {"Comparison", NULL},
     {"  eq (equal, 52B) x1M", bench_eq_same},
+
+    {"View", NULL},
+    {"  view_find (hit, 10KB) x100K", bench_view_find_vs_ztr_find},
+    {"  view_find_char (hit, 10KB) x100K", bench_view_find_char},
+    {"  view_starts_with (12B) x10M", bench_view_starts_with},
+    {"  view_eq_cstr (4B match) x10M", bench_view_eq_cstr},
+    {"  view_trim (18B) x10M", bench_view_trim},
+    {"  view_split_iter (1K fields) x10K", bench_view_split_iter},
+    {"  view_is_ascii (10KB) x10K", bench_view_is_ascii},
+    {"  view_is_valid_utf8 (10KB ASCII) x10K", bench_view_is_valid_utf8_ascii},
+    {"  from_view+free (SSO) x1M", bench_from_view},
 };
 
 int main(void) {
