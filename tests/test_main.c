@@ -11,6 +11,7 @@ extern SUITE(split_join);
 extern SUITE(utf8);
 extern SUITE(interop);
 extern SUITE(edge_cases);
+extern SUITE(view);
 
 GREATEST_MAIN_DEFS();
 
@@ -26,6 +27,7 @@ int main(int argc, char **argv) {
     RUN_SUITE(split_join);
     RUN_SUITE(utf8);
     RUN_SUITE(interop);
+    RUN_SUITE(view);
     RUN_SUITE(edge_cases);
 
     GREATEST_MAIN_END();

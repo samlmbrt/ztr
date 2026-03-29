@@ -52,6 +52,7 @@ if(ZTR_BUILD_TESTS)
         tests/test_utf8.c
         tests/test_interop.c
         tests/test_edge_cases.c
+        tests/test_view.c
     )
     target_include_directories(ztr_tests PRIVATE tests)
     target_link_libraries(ztr_tests PRIVATE ztr)
