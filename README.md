@@ -270,7 +270,6 @@ typedef struct ztr_view {
 ## Documentation
 
 - [docs/API.md](docs/API.md) — complete API reference (signatures, edge cases, guarantees)
-- [docs/DESIGN_DISCUSSION.md](docs/DESIGN_DISCUSSION.md) — design panel record (rationale, alternatives considered, trade-offs)
 
 ## License
 
