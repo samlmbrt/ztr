@@ -111,6 +111,74 @@ static inline bool ztr_p_is_ascii_space(char c) {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f';
 }
 
+/* Shared buffer-level helpers used by both ztr and ztr_view functions. */
+
+static bool ztr_p_is_ascii_buf(const unsigned char *data, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        if (data[i] > 0x7F) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool ztr_p_is_valid_utf8_buf(const unsigned char *data, size_t len) {
+    size_t i = 0;
+
+    while (i < len) {
+        unsigned char b = data[i];
+        size_t seq_len;
+        uint32_t cp;
+
+        if (b <= 0x7F) {
+            i++;
+            continue;
+        } else if ((b & 0xE0) == 0xC0) {
+            seq_len = 2;
+            cp = b & 0x1F;
+        } else if ((b & 0xF0) == 0xE0) {
+            seq_len = 3;
+            cp = b & 0x0F;
+        } else if ((b & 0xF8) == 0xF0) {
+            seq_len = 4;
+            cp = b & 0x07;
+        } else {
+            return false;
+        }
+
+        if (i + seq_len > len) {
+            return false;
+        }
+
+        for (size_t j = 1; j < seq_len; j++) {
+            if ((data[i + j] & 0xC0) != 0x80) {
+                return false;
+            }
+            cp = (cp << 6) | (data[i + j] & 0x3F);
+        }
+
+        if (seq_len == 2 && cp < 0x80) {
+            return false;
+        }
+        if (seq_len == 3 && cp < 0x800) {
+            return false;
+        }
+        if (seq_len == 4 && cp < 0x10000) {
+            return false;
+        }
+        if (cp >= 0xD800 && cp <= 0xDFFF) {
+            return false;
+        }
+        if (cp > 0x10FFFF) {
+            return false;
+        }
+
+        i += seq_len;
+    }
+
+    return true;
+}
+
 /* ---- Lifecycle ---- */
 
 void ztr_init(ztr *s) { memset(s, 0, sizeof(*s)); }
@@ -1181,65 +1249,7 @@ ztr_err ztr_join_cstr(ztr *out, const char *const *parts, size_t count, const ch
 /* ---- UTF-8 ---- */
 
 bool ztr_is_valid_utf8(const ztr *s) {
-    const unsigned char *data = (const unsigned char *)ztr_cstr(s);
-    size_t len = ztr_len(s);
-    size_t i = 0;
-
-    while (i < len) {
-        unsigned char b = data[i];
-        size_t seq_len;
-        uint32_t cp;
-
-        if (b <= 0x7F) {
-            i++;
-            continue;
-        } else if ((b & 0xE0) == 0xC0) {
-            seq_len = 2;
-            cp = b & 0x1F;
-        } else if ((b & 0xF0) == 0xE0) {
-            seq_len = 3;
-            cp = b & 0x0F;
-        } else if ((b & 0xF8) == 0xF0) {
-            seq_len = 4;
-            cp = b & 0x07;
-        } else {
-            return false; /* Invalid leading byte. */
-        }
-
-        if (i + seq_len > len) {
-            return false; /* Truncated sequence. */
-        }
-
-        for (size_t j = 1; j < seq_len; j++) {
-            if ((data[i + j] & 0xC0) != 0x80) {
-                return false; /* Invalid continuation byte. */
-            }
-            cp = (cp << 6) | (data[i + j] & 0x3F);
-        }
-
-        /* Reject overlong encodings. */
-        if (seq_len == 2 && cp < 0x80) {
-            return false;
-        }
-        if (seq_len == 3 && cp < 0x800) {
-            return false;
-        }
-        if (seq_len == 4 && cp < 0x10000) {
-            return false;
-        }
-
-        /* Reject surrogates and out-of-range. */
-        if (cp >= 0xD800 && cp <= 0xDFFF) {
-            return false;
-        }
-        if (cp > 0x10FFFF) {
-            return false;
-        }
-
-        i += seq_len;
-    }
-
-    return true;
+    return ztr_p_is_valid_utf8_buf((const unsigned char *)ztr_cstr(s), ztr_len(s));
 }
 
 ztr_err ztr_utf8_len(size_t *out, const ztr *s) {
@@ -1466,14 +1476,7 @@ void ztr_swap(ztr *a, ztr *b) {
 /* ---- Utility ---- */
 
 bool ztr_is_ascii(const ztr *s) {
-    const unsigned char *data = (const unsigned char *)ztr_cstr(s);
-    size_t len = ztr_len(s);
-    for (size_t i = 0; i < len; i++) {
-        if (data[i] > 0x7F) {
-            return false;
-        }
-    }
-    return true;
+    return ztr_p_is_ascii_buf((const unsigned char *)ztr_cstr(s), ztr_len(s));
 }
 
 const char *ztr_err_str(ztr_err err) {
@@ -1492,4 +1495,346 @@ const char *ztr_err_str(ztr_err err) {
         return "size overflow";
     }
     return "unknown error";
+}
+
+/* ======================================================================== */
+/* ---- String View ----                                                    */
+/* ======================================================================== */
+
+/* ---- View: Comparison ---- */
+
+bool ztr_view_eq(ztr_view a, ztr_view b) {
+    if (a.len != b.len) {
+        return false;
+    }
+    if (a.len == 0) {
+        return true;
+    }
+    return memcmp(a.data, b.data, a.len) == 0;
+}
+
+bool ztr_view_eq_cstr(ztr_view v, const char *cstr) {
+    if (!cstr) {
+        return v.len == 0;
+    }
+    size_t clen = strlen(cstr);
+    if (v.len != clen) {
+        return false;
+    }
+    if (v.len == 0) {
+        return true;
+    }
+    return memcmp(v.data, cstr, v.len) == 0;
+}
+
+int ztr_view_cmp(ztr_view a, ztr_view b) {
+    size_t min_len = a.len < b.len ? a.len : b.len;
+    int r = min_len > 0 ? memcmp(a.data, b.data, min_len) : 0;
+    if (r != 0) {
+        return r;
+    }
+    if (a.len < b.len) {
+        return -1;
+    }
+    if (a.len > b.len) {
+        return 1;
+    }
+    return 0;
+}
+
+int ztr_view_cmp_cstr(ztr_view v, const char *cstr) {
+    if (!cstr) {
+        return v.len == 0 ? 0 : 1;
+    }
+    size_t clen = strlen(cstr);
+    size_t min_len = v.len < clen ? v.len : clen;
+    int r = min_len > 0 ? memcmp(v.data, cstr, min_len) : 0;
+    if (r != 0) {
+        return r;
+    }
+    if (v.len < clen) {
+        return -1;
+    }
+    if (v.len > clen) {
+        return 1;
+    }
+    return 0;
+}
+
+bool ztr_view_eq_ascii_nocase(ztr_view a, ztr_view b) {
+    if (a.len != b.len) {
+        return false;
+    }
+    for (size_t i = 0; i < a.len; i++) {
+        unsigned char ac = (unsigned char)a.data[i];
+        unsigned char bc = (unsigned char)b.data[i];
+        if (ac >= 'A' && ac <= 'Z') {
+            ac = ac - 'A' + 'a';
+        }
+        if (bc >= 'A' && bc <= 'Z') {
+            bc = bc - 'A' + 'a';
+        }
+        if (ac != bc) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool ztr_view_eq_ascii_nocase_cstr(ztr_view v, const char *cstr) {
+    if (!cstr) {
+        return v.len == 0;
+    }
+    return ztr_view_eq_ascii_nocase(v, ztr_view_from_cstr(cstr));
+}
+
+/* ---- View: Search (view needle) ---- */
+
+size_t ztr_view_find(ztr_view v, ztr_view needle, size_t start) {
+    if (needle.len == 0) {
+        return start <= v.len ? start : ZTR_NPOS;
+    }
+    if (start > v.len || needle.len > v.len - start) {
+        return ZTR_NPOS;
+    }
+
+    const char *found =
+        (const char *)ztr_p_memmem(v.data + start, v.len - start, needle.data, needle.len);
+    if (!found) {
+        return ZTR_NPOS;
+    }
+    return (size_t)(found - v.data);
+}
+
+size_t ztr_view_rfind(ztr_view v, ztr_view needle, size_t start) {
+    if (needle.len == 0) {
+        return (start == ZTR_NPOS || start > v.len) ? v.len : start;
+    }
+    if (needle.len > v.len) {
+        return ZTR_NPOS;
+    }
+
+    size_t last_possible = v.len - needle.len;
+    if (start != ZTR_NPOS && start < last_possible) {
+        last_possible = start;
+    }
+
+    if (needle.len == 1) {
+        unsigned char target = (unsigned char)needle.data[0];
+        for (size_t i = last_possible + 1; i > 0; i--) {
+            if ((unsigned char)v.data[i - 1] == target) {
+                return i - 1;
+            }
+        }
+        return ZTR_NPOS;
+    }
+
+    unsigned char first = (unsigned char)needle.data[0];
+    for (size_t i = last_possible + 1; i > 0; i--) {
+        if ((unsigned char)v.data[i - 1] == first &&
+            memcmp(v.data + i - 1, needle.data, needle.len) == 0) {
+            return i - 1;
+        }
+    }
+    return ZTR_NPOS;
+}
+
+bool ztr_view_contains(ztr_view v, ztr_view needle) {
+    return ztr_view_find(v, needle, 0) != ZTR_NPOS;
+}
+
+bool ztr_view_starts_with(ztr_view v, ztr_view prefix) {
+    if (prefix.len == 0) {
+        return true;
+    }
+    if (prefix.len > v.len) {
+        return false;
+    }
+    return memcmp(v.data, prefix.data, prefix.len) == 0;
+}
+
+bool ztr_view_ends_with(ztr_view v, ztr_view suffix) {
+    if (suffix.len == 0) {
+        return true;
+    }
+    if (suffix.len > v.len) {
+        return false;
+    }
+    return memcmp(v.data + v.len - suffix.len, suffix.data, suffix.len) == 0;
+}
+
+size_t ztr_view_count(ztr_view v, ztr_view needle) {
+    if (needle.len == 0) {
+        return 0;
+    }
+
+    size_t total = 0;
+    size_t pos = 0;
+    while (pos + needle.len <= v.len) {
+        size_t found = ztr_view_find(v, needle, pos);
+        if (found == ZTR_NPOS) {
+            break;
+        }
+        total++;
+        pos = found + needle.len;
+    }
+    return total;
+}
+
+/* ---- View: Search (C string needle) ---- */
+
+size_t ztr_view_find_cstr(ztr_view v, const char *needle, size_t start) {
+    return ztr_view_find(v, ztr_view_from_cstr(needle), start);
+}
+
+size_t ztr_view_rfind_cstr(ztr_view v, const char *needle, size_t start) {
+    return ztr_view_rfind(v, ztr_view_from_cstr(needle), start);
+}
+
+bool ztr_view_contains_cstr(ztr_view v, const char *needle) {
+    return ztr_view_contains(v, ztr_view_from_cstr(needle));
+}
+
+bool ztr_view_starts_with_cstr(ztr_view v, const char *prefix) {
+    return ztr_view_starts_with(v, ztr_view_from_cstr(prefix));
+}
+
+bool ztr_view_ends_with_cstr(ztr_view v, const char *suffix) {
+    return ztr_view_ends_with(v, ztr_view_from_cstr(suffix));
+}
+
+size_t ztr_view_count_cstr(ztr_view v, const char *needle) {
+    return ztr_view_count(v, ztr_view_from_cstr(needle));
+}
+
+/* ---- View: Search (single character) ---- */
+
+size_t ztr_view_find_char(ztr_view v, char c, size_t start) {
+    if (start >= v.len) {
+        return ZTR_NPOS;
+    }
+    const char *found = (const char *)memchr(v.data + start, (unsigned char)c, v.len - start);
+    if (!found) {
+        return ZTR_NPOS;
+    }
+    return (size_t)(found - v.data);
+}
+
+size_t ztr_view_rfind_char(ztr_view v, char c, size_t start) {
+    if (v.len == 0) {
+        return ZTR_NPOS;
+    }
+    size_t last = v.len - 1;
+    if (start != ZTR_NPOS && start < last) {
+        last = start;
+    }
+    unsigned char target = (unsigned char)c;
+    for (size_t i = last + 1; i > 0; i--) {
+        if ((unsigned char)v.data[i - 1] == target) {
+            return i - 1;
+        }
+    }
+    return ZTR_NPOS;
+}
+
+bool ztr_view_contains_char(ztr_view v, char c) {
+    if (v.len == 0) {
+        return false;
+    }
+    return memchr(v.data, (unsigned char)c, v.len) != NULL;
+}
+
+/* ---- View: Trimming ---- */
+
+ztr_view ztr_view_trim_start(ztr_view v) {
+    size_t i = 0;
+    while (i < v.len && ztr_p_is_ascii_space(v.data[i])) {
+        i++;
+    }
+    ztr_view out;
+    out.data = v.data + i;
+    out.len = v.len - i;
+    return out;
+}
+
+ztr_view ztr_view_trim_end(ztr_view v) {
+    size_t len = v.len;
+    while (len > 0 && ztr_p_is_ascii_space(v.data[len - 1])) {
+        len--;
+    }
+    ztr_view out;
+    out.data = v.data;
+    out.len = len;
+    return out;
+}
+
+ztr_view ztr_view_trim(ztr_view v) {
+    return ztr_view_trim_start(ztr_view_trim_end(v));
+}
+
+/* ---- View: Split iterator ---- */
+
+void ztr_view_split_begin(ztr_view_split_iter *it, ztr_view s, ztr_view delim) {
+    it->ztr_p_remaining = s;
+    it->ztr_p_delim = delim;
+    it->ztr_p_done = false;
+}
+
+void ztr_view_split_begin_cstr(ztr_view_split_iter *it, ztr_view s, const char *delim) {
+    ztr_view_split_begin(it, s, ztr_view_from_cstr(delim));
+}
+
+bool ztr_view_split_next(ztr_view_split_iter *it, ztr_view *token) {
+    if (it->ztr_p_done) {
+        return false;
+    }
+
+    ztr_view rem = it->ztr_p_remaining;
+    size_t dlen = it->ztr_p_delim.len;
+
+    /* Empty delimiter: yield entire remainder. */
+    if (dlen == 0) {
+        *token = rem;
+        it->ztr_p_done = true;
+        return true;
+    }
+
+    const char *found =
+        (const char *)ztr_p_memmem(rem.data, rem.len, it->ztr_p_delim.data, dlen);
+
+    if (!found) {
+        /* No more delimiters — yield the rest. */
+        *token = rem;
+        it->ztr_p_done = true;
+        return true;
+    }
+
+    size_t token_len = (size_t)(found - rem.data);
+    token->data = rem.data;
+    token->len = token_len;
+
+    /* Advance past token + delimiter. */
+    size_t consumed = token_len + dlen;
+    it->ztr_p_remaining.data = rem.data + consumed;
+    it->ztr_p_remaining.len = rem.len - consumed;
+
+    return true;
+}
+
+/* ---- View: Utility ---- */
+
+bool ztr_view_is_ascii(ztr_view v) {
+    return ztr_p_is_ascii_buf((const unsigned char *)v.data, v.len);
+}
+
+bool ztr_view_is_valid_utf8(ztr_view v) {
+    return ztr_p_is_valid_utf8_buf((const unsigned char *)v.data, v.len);
+}
+
+/* ---- View: Interop ---- */
+
+ztr_err ztr_from_view(ztr *s, ztr_view v) {
+    /* Delegate to ztr_assign_buf which handles self-referential input
+       (v.data may point into s's buffer) and existing content in s. */
+    return ztr_assign_buf(s, v.data, v.len);
 }

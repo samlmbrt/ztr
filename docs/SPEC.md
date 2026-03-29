@@ -1,4 +1,4 @@
-# ZTR v1 Specification
+# ZTR v1.3 Specification
 
 ## 1. Overview
 
@@ -25,7 +25,7 @@
 - `ztr.h` — public API, struct definition, and `static inline` hot accessors
 - `ztr.c` — implementation
 
-The following functions are inlined in the header for performance: `ztr_len`, `ztr_cstr`, `ztr_is_empty`, `ztr_capacity`, `ztr_at`, `ztr_append_byte` (fast path only), `ztr_append_buf` (fast path only), `ztr_clear`, and `ztr_data_mut`.
+The following functions are inlined in the header for performance: `ztr_len`, `ztr_cstr`, `ztr_is_empty`, `ztr_capacity`, `ztr_at`, `ztr_append_byte` (fast path only), and `ztr_data_mut`.
 
 ---
 
@@ -166,6 +166,10 @@ typedef enum {
 #define ZTR_SSO_CAP     (sizeof(char*) + sizeof(size_t) - 1)  // 15 or 7
 #define ZTR_MAX_LEN     (SIZE_MAX >> 1)                        // max representable string length
 #define ZTR_NPOS        ((size_t)-1)                           // "not found" sentinel
+
+// Printf helpers for ztr (mirrors ZTR_VIEW_FMT/ZTR_VIEW_ARG)
+#define ZTR_FMT         "%.*s"
+#define ZTR_ARG(s)      (int)ztr_len(s), ztr_cstr(s)
 ```
 
 ---
@@ -377,7 +381,7 @@ void ztr_erase(ztr *s, size_t pos, size_t count);
 
 // Replace the first occurrence of needle with replacement.
 // Safe when needle or replacement point into s.
-// Returns ZTR_ERR_OUT_OF_RANGE if needle is not found.
+// Returns ZTR_OK if needle is not found (no-op).
 ztr_err ztr_replace_first(ztr *s, const char *needle, const char *replacement);
 
 // Replace all non-overlapping occurrences of needle (left-to-right) with
@@ -630,7 +634,7 @@ bool ztr_is_ascii(const ztr *s);
 | `ztr_swap`            | `void`        | No             | Interop        |
 | `ztr_is_ascii`        | `bool`        | No             | Utility        |
 
-**Total: 62 functions** (6 `static inline` in header, 56 in `ztr.c`).
+**Total: 62 `ztr` functions** (7 `static inline` in header, 55 in `ztr.c`). See section 14 for 40 additional `ztr_view` functions.
 
 ---
 
@@ -729,12 +733,11 @@ Most split use cases process tokens sequentially without needing random access. 
 
 ---
 
-## 13. Future Directions (v2)
+## 13. Future Directions
 
-The following features are intentionally deferred from v1. The v1 data structure and API are designed to accommodate all of them without breaking changes:
+The following features are intentionally deferred. The data structure and API are designed to accommodate all of them without breaking changes:
 
 - Custom allocator per-instance via function pointers in a config struct
-- String views and borrowed slices (`ztr_view` type, non-owning)
 - Codepoint iterator struct for UTF-8 traversal
 - Additional feature gates (`ZTR_NO_UTF8`, `ZTR_NO_SPLIT`)
 - `ZTR_NO_ALLOC` compile-time mode for SSO-only, zero-heap environments
@@ -745,4 +748,256 @@ The following features are intentionally deferred from v1. The v1 data structure
 
 ---
 
-_This specification is the authoritative reference for implementing ztr v1._
+## 14. String View (`ztr_view`)
+
+### Overview
+
+`ztr_view` is a non-owning, read-only reference to a contiguous range of bytes. It enables zero-copy patterns for parsers and APIs that reference slices of existing buffers without allocating.
+
+**Lifetime contract:** A `ztr_view` does **not** own its data. The caller must ensure the underlying buffer outlives the view and is not mutated while the view is in use. Mutating or freeing the source (`ztr`, buffer, etc.) invalidates all views derived from it. C has no borrow checker — this contract is enforced by documentation, not the type system.
+
+### Layout
+
+```c
+typedef struct ztr_view {
+    const char *data;   // pointer to byte data (NOT guaranteed null-terminated)
+    size_t len;         // byte length
+} ztr_view;
+// sizeof: 16 on 64-bit, 8 on 32-bit. Passed by value (fits in 2 registers).
+
+_Static_assert(sizeof(ztr_view) == sizeof(size_t) * 2, "unexpected ztr_view struct size");
+```
+
+### Properties
+
+| Property              | Value                                                         |
+| --------------------- | ------------------------------------------------------------- |
+| `sizeof(ztr_view)`    | 16 on 64-bit, 8 on 32-bit                                    |
+| Null-terminated?      | No — views can reference slices mid-buffer                    |
+| Passed by             | Value (2 registers on all common calling conventions)          |
+| Ownership             | None — caller responsible for source lifetime                 |
+| Mutation              | None — all operations are read-only                           |
+
+### Constants and Macros
+
+```c
+// Canonical empty view. data is always non-NULL and dereferenceable.
+// C++ compatible (compound literals are not valid C++).
+#ifdef __cplusplus
+#define ZTR_VIEW_EMPTY  (ztr_view{"", 0})
+#else
+#define ZTR_VIEW_EMPTY  ((ztr_view){"", 0})
+#endif
+
+// Compile-time view from a string literal (no strlen, zero runtime cost).
+// WARNING: Only use with string literals, not char* variables.
+// On GCC/Clang, passing a non-array argument is a compile-time error
+// (enforced via __builtin_types_compatible_p). On other compilers, the
+// macro silently produces wrong results for non-literal arguments.
+#define ZTR_VIEW_LIT(s) ((ztr_view){(s), sizeof(s) - 1})
+
+// Printf helpers: printf("val=" ZTR_VIEW_FMT "\n", ZTR_VIEW_ARG(v));
+// View data is NOT null-terminated — always use these macros, never %s.
+#define ZTR_VIEW_FMT       "%.*s"
+#define ZTR_VIEW_ARG(v)    (int)(v).len, (v).data
+```
+
+### NULL Handling
+
+- `ztr_view_from_cstr(NULL)` → `ZTR_VIEW_EMPTY`.
+- `ztr_view_from_buf(NULL, 0)` → `ZTR_VIEW_EMPTY`.
+- `ztr_view_from_buf(NULL, n>0)` → `ZTR_VIEW_EMPTY`.
+- `ztr_view_from_ztr(NULL)` → `ZTR_VIEW_EMPTY`.
+- `_cstr` needle functions with `NULL` → treat as `""`.
+- `ztr_view_split_begin_cstr(it, s, NULL)` → treats as empty delimiter (yields entire string as one token).
+- `data` is always non-NULL for views produced by library functions.
+
+### 14.1 Construction (static inline, infallible)
+
+```c
+// From a null-terminated C string. Calls strlen.
+ztr_view ztr_view_from_cstr(const char *cstr);
+
+// From a byte buffer with explicit length. No strlen.
+ztr_view ztr_view_from_buf(const char *buf, size_t len);
+
+// From an existing ztr (borrows, does not copy).
+// The ztr must not be mutated or freed while the view is in use.
+ztr_view ztr_view_from_ztr(const ztr *s);
+
+// Extract a sub-view. Clamped: pos >= len returns ZTR_VIEW_EMPTY,
+// count is clamped to available bytes. No allocation, no UB.
+ztr_view ztr_view_substr(ztr_view v, size_t pos, size_t count);
+```
+
+### 14.2 Accessors (static inline, infallible)
+
+```c
+size_t      ztr_view_len(ztr_view v);       // byte length
+const char *ztr_view_data(ztr_view v);      // pointer to data (NOT null-terminated)
+bool        ztr_view_is_empty(ztr_view v);  // true if len == 0
+char        ztr_view_at(ztr_view v, size_t i); // byte at index; '\0' if i >= len
+```
+
+### 14.3 Comparison
+
+```c
+bool ztr_view_eq(ztr_view a, ztr_view b);
+bool ztr_view_eq_cstr(ztr_view v, const char *cstr);
+int  ztr_view_cmp(ztr_view a, ztr_view b);
+int  ztr_view_cmp_cstr(ztr_view v, const char *cstr);
+bool ztr_view_eq_ascii_nocase(ztr_view a, ztr_view b);
+bool ztr_view_eq_ascii_nocase_cstr(ztr_view v, const char *cstr);
+```
+
+### 14.4 Search (view needle)
+
+All search functions return `ZTR_NPOS` when not found. Empty needle behavior matches the `ztr` search API.
+
+```c
+size_t ztr_view_find(ztr_view v, ztr_view needle, size_t start);
+size_t ztr_view_rfind(ztr_view v, ztr_view needle, size_t start);
+bool   ztr_view_contains(ztr_view v, ztr_view needle);
+bool   ztr_view_starts_with(ztr_view v, ztr_view prefix);
+bool   ztr_view_ends_with(ztr_view v, ztr_view suffix);
+size_t ztr_view_count(ztr_view v, ztr_view needle);
+```
+
+### 14.5 Search (C string needle — convenience)
+
+Thin wrappers that call `strlen` on the needle, then delegate to the view-needle version. For string literals, prefer `ZTR_VIEW_LIT` with the view-needle functions to avoid `strlen`.
+
+```c
+size_t ztr_view_find_cstr(ztr_view v, const char *needle, size_t start);
+size_t ztr_view_rfind_cstr(ztr_view v, const char *needle, size_t start);
+bool   ztr_view_contains_cstr(ztr_view v, const char *needle);
+bool   ztr_view_starts_with_cstr(ztr_view v, const char *prefix);
+bool   ztr_view_ends_with_cstr(ztr_view v, const char *suffix);
+size_t ztr_view_count_cstr(ztr_view v, const char *needle);
+```
+
+### 14.6 Search (single character)
+
+Direct `memchr` fast path. Optimal for delimiter scanning in parsers.
+
+```c
+size_t ztr_view_find_char(ztr_view v, char c, size_t start);
+size_t ztr_view_rfind_char(ztr_view v, char c, size_t start);
+bool   ztr_view_contains_char(ztr_view v, char c);
+```
+
+### 14.7 Trimming (returns narrowed view, no allocation)
+
+ASCII whitespace only: `' '`, `'\t'`, `'\n'`, `'\r'`, `'\v'`, `'\f'`.
+
+```c
+ztr_view ztr_view_trim(ztr_view v);
+ztr_view ztr_view_trim_start(ztr_view v);
+ztr_view ztr_view_trim_end(ztr_view v);
+```
+
+### 14.8 Slice Manipulation (static inline, clamped)
+
+```c
+// Remove n bytes from the front. Returns ZTR_VIEW_EMPTY if n >= len.
+ztr_view ztr_view_remove_prefix(ztr_view v, size_t n);
+
+// Remove n bytes from the back. Returns ZTR_VIEW_EMPTY if n >= len.
+ztr_view ztr_view_remove_suffix(ztr_view v, size_t n);
+```
+
+### 14.9 Split Iterator
+
+Mirrors the `ztr_split_iter` pattern. Zero allocation. The source view must remain valid for the lifetime of the iterator.
+
+```c
+typedef struct {
+    ztr_view ztr_p_remaining;
+    ztr_view ztr_p_delim;
+    bool     ztr_p_done;
+} ztr_view_split_iter;
+
+void ztr_view_split_begin(ztr_view_split_iter *it, ztr_view s, ztr_view delim);
+void ztr_view_split_begin_cstr(ztr_view_split_iter *it, ztr_view s, const char *delim);
+bool ztr_view_split_next(ztr_view_split_iter *it, ztr_view *token);
+```
+
+**Usage:**
+```c
+ztr_view_split_iter it;
+ztr_view token;
+ztr_view_split_begin_cstr(&it, input, ",");
+while (ztr_view_split_next(&it, &token)) {
+    printf("token: " ZTR_VIEW_FMT "\n", ZTR_VIEW_ARG(token));
+}
+```
+
+### 14.10 Utility
+
+```c
+bool ztr_view_is_ascii(ztr_view v);
+bool ztr_view_is_valid_utf8(ztr_view v);
+```
+
+### 14.11 Interop
+
+```c
+// Copy view data into an owned ztr. Allocates.
+// Unlike other ztr_from_* functions, also works on already-initialized strings
+// (frees existing content first). This is because views commonly reference the
+// target string's own buffer.
+// Safe when v references s's buffer (self-referential).
+ztr_err ztr_from_view(ztr *s, ztr_view v);
+```
+
+### 14.12 View API Summary Table
+
+| Function                         | Returns       | Inline?  | Category       |
+| -------------------------------- | ------------- | -------- | -------------- |
+| `ztr_view_from_cstr`             | `ztr_view`    | Yes      | Construction   |
+| `ztr_view_from_buf`              | `ztr_view`    | Yes      | Construction   |
+| `ztr_view_from_ztr`              | `ztr_view`    | Yes      | Construction   |
+| `ztr_view_substr`                | `ztr_view`    | Yes      | Construction   |
+| `ztr_view_len`                   | `size_t`      | Yes      | Accessor       |
+| `ztr_view_data`                  | `const char*` | Yes      | Accessor       |
+| `ztr_view_is_empty`              | `bool`        | Yes      | Accessor       |
+| `ztr_view_at`                    | `char`        | Yes      | Accessor       |
+| `ztr_view_eq`                    | `bool`        | No       | Comparison     |
+| `ztr_view_eq_cstr`               | `bool`        | No       | Comparison     |
+| `ztr_view_cmp`                   | `int`         | No       | Comparison     |
+| `ztr_view_cmp_cstr`              | `int`         | No       | Comparison     |
+| `ztr_view_eq_ascii_nocase`       | `bool`        | No       | Comparison     |
+| `ztr_view_eq_ascii_nocase_cstr`  | `bool`        | No       | Comparison     |
+| `ztr_view_find`                  | `size_t`      | No       | Search (view)  |
+| `ztr_view_rfind`                 | `size_t`      | No       | Search (view)  |
+| `ztr_view_contains`              | `bool`        | No       | Search (view)  |
+| `ztr_view_starts_with`           | `bool`        | No       | Search (view)  |
+| `ztr_view_ends_with`             | `bool`        | No       | Search (view)  |
+| `ztr_view_count`                 | `size_t`      | No       | Search (view)  |
+| `ztr_view_find_cstr`             | `size_t`      | No       | Search (cstr)  |
+| `ztr_view_rfind_cstr`            | `size_t`      | No       | Search (cstr)  |
+| `ztr_view_contains_cstr`         | `bool`        | No       | Search (cstr)  |
+| `ztr_view_starts_with_cstr`      | `bool`        | No       | Search (cstr)  |
+| `ztr_view_ends_with_cstr`        | `bool`        | No       | Search (cstr)  |
+| `ztr_view_count_cstr`            | `size_t`      | No       | Search (cstr)  |
+| `ztr_view_find_char`             | `size_t`      | No       | Search (char)  |
+| `ztr_view_rfind_char`            | `size_t`      | No       | Search (char)  |
+| `ztr_view_contains_char`         | `bool`        | No       | Search (char)  |
+| `ztr_view_trim`                  | `ztr_view`    | No       | Trimming       |
+| `ztr_view_trim_start`            | `ztr_view`    | No       | Trimming       |
+| `ztr_view_trim_end`              | `ztr_view`    | No       | Trimming       |
+| `ztr_view_remove_prefix`         | `ztr_view`    | Yes      | Slice          |
+| `ztr_view_remove_suffix`         | `ztr_view`    | Yes      | Slice          |
+| `ztr_view_split_begin`           | `void`        | No       | Split          |
+| `ztr_view_split_begin_cstr`      | `void`        | No       | Split          |
+| `ztr_view_split_next`            | `bool`        | No       | Split          |
+| `ztr_view_is_ascii`              | `bool`        | No       | Utility        |
+| `ztr_view_is_valid_utf8`         | `bool`        | No       | Utility        |
+| `ztr_from_view`                  | `ztr_err`     | No       | Interop        |
+
+**Total: 40 `ztr_view` functions** (10 `static inline` in header, 30 in `ztr.c`).
+**4 view macros:** `ZTR_VIEW_EMPTY`, `ZTR_VIEW_LIT`, `ZTR_VIEW_FMT`, `ZTR_VIEW_ARG`. Additionally, `ZTR_FMT` and `ZTR_ARG` (documented in section 5) mirror the view macros for the owning `ztr` type.
+
+---
+
+_This specification is the authoritative reference for implementing ztr._

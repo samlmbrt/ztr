@@ -8,6 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #if defined(__GNUC__) || defined(__clang__)
 #define ZTR_PRINTF_FMT(fmt_idx, arg_idx) __attribute__((format(printf, fmt_idx, arg_idx)))
@@ -44,6 +45,10 @@
 #define ZTR_MAX_LEN (SIZE_MAX >> 1)
 #define ZTR_SSO_CAP (sizeof(char *) + sizeof(size_t) - 1)
 #define ZTR_NPOS ((size_t)-1)
+
+/* Printf helpers for ztr (mirrors ZTR_VIEW_FMT/ZTR_VIEW_ARG below). */
+#define ZTR_FMT "%.*s"
+#define ZTR_ARG(s) (int)ztr_len(s), ztr_cstr(s)
 
 /* --- Data structure --- */
 
@@ -216,5 +221,181 @@ void ztr_swap(ztr *a, ztr *b);
 
 bool ztr_is_ascii(const ztr *s);
 const char *ztr_err_str(ztr_err err);
+
+/* ========================================================================
+ * String View — non-owning, read-only reference to a contiguous byte range
+ *
+ * A ztr_view does NOT own its data. The caller must ensure the underlying
+ * buffer outlives the view and is not mutated while the view is in use.
+ * Mutating or freeing the source (ztr, buffer, etc.) invalidates all
+ * views derived from it.
+ * ======================================================================== */
+
+typedef struct ztr_view {
+    const char *data;
+    size_t len;
+} ztr_view;
+
+_Static_assert(sizeof(ztr_view) == sizeof(size_t) * 2, "unexpected ztr_view struct size");
+
+/* Canonical empty view. data is always non-NULL and dereferenceable. */
+#ifdef __cplusplus
+#define ZTR_VIEW_EMPTY (ztr_view{"", 0})
+#else
+#define ZTR_VIEW_EMPTY ((ztr_view){"", 0})
+#endif
+
+/* Compile-time view from a string literal. No strlen call.
+   WARNING: Only use with string literals, not char* variables. On GCC/Clang,
+   passing a non-array argument is a compile-time error. */
+#if defined(__GNUC__) || defined(__clang__)
+#define ZTR_VIEW_LIT(s)                                                                            \
+    (__extension__({                                                                                \
+        _Static_assert(__builtin_types_compatible_p(__typeof__(s), char[sizeof(s)]),                 \
+                       "ZTR_VIEW_LIT requires a string literal");                                   \
+        (ztr_view){(s), sizeof(s) - 1};                                                            \
+    }))
+#else
+#define ZTR_VIEW_LIT(s) ((ztr_view){(s), sizeof(s) - 1})
+#endif
+
+/* Printf helpers: printf("val=" ZTR_VIEW_FMT "\n", ZTR_VIEW_ARG(v)); */
+#define ZTR_VIEW_FMT "%.*s"
+#define ZTR_VIEW_ARG(v) (int)(v).len, (v).data
+
+/* --- Construction (static inline, infallible) --- */
+
+static inline ztr_view ztr_view_from_buf(const char *buf, size_t len) {
+    if (!buf) return ZTR_VIEW_EMPTY;
+    ztr_view v;
+    v.data = buf;
+    v.len = len;
+    return v;
+}
+
+static inline ztr_view ztr_view_from_cstr(const char *cstr) {
+    if (!cstr) return ZTR_VIEW_EMPTY;
+    ztr_view v;
+    v.data = cstr;
+    v.len = strlen(cstr);
+    return v;
+}
+
+/* Borrow from an existing ztr. The ztr must not be mutated or freed
+   while the view is in use — any mutation may reallocate, invalidating
+   the view's data pointer. */
+static inline ztr_view ztr_view_from_ztr(const ztr *s) {
+    if (!s) return ZTR_VIEW_EMPTY;
+    ztr_view v;
+    v.data = ztr_cstr(s);
+    v.len = ztr_len(s);
+    return v;
+}
+
+/* Extract a sub-view. Clamped: pos >= len returns empty, count clamped to
+   available bytes. No allocation, no UB. */
+static inline ztr_view ztr_view_substr(ztr_view v, size_t pos, size_t count) {
+    if (pos >= v.len) return ZTR_VIEW_EMPTY;
+    size_t avail = v.len - pos;
+    if (count > avail) count = avail;
+    ztr_view out;
+    out.data = v.data + pos;
+    out.len = count;
+    return out;
+}
+
+/* --- Accessors (static inline, infallible) --- */
+
+static inline size_t ztr_view_len(ztr_view v) { return v.len; }
+static inline const char *ztr_view_data(ztr_view v) { return v.data; }
+static inline bool ztr_view_is_empty(ztr_view v) { return v.len == 0; }
+
+/* Returns '\0' if i >= len (matches ztr_at behavior). */
+static inline char ztr_view_at(ztr_view v, size_t i) {
+    return (i < v.len) ? v.data[i] : '\0';
+}
+
+/* --- Comparison --- */
+
+bool ztr_view_eq(ztr_view a, ztr_view b);
+bool ztr_view_eq_cstr(ztr_view v, const char *cstr);
+int ztr_view_cmp(ztr_view a, ztr_view b);
+int ztr_view_cmp_cstr(ztr_view v, const char *cstr);
+bool ztr_view_eq_ascii_nocase(ztr_view a, ztr_view b);
+bool ztr_view_eq_ascii_nocase_cstr(ztr_view v, const char *cstr);
+
+/* --- Search (view needle) --- */
+
+size_t ztr_view_find(ztr_view v, ztr_view needle, size_t start);
+size_t ztr_view_rfind(ztr_view v, ztr_view needle, size_t start);
+bool ztr_view_contains(ztr_view v, ztr_view needle);
+bool ztr_view_starts_with(ztr_view v, ztr_view prefix);
+bool ztr_view_ends_with(ztr_view v, ztr_view suffix);
+size_t ztr_view_count(ztr_view v, ztr_view needle);
+
+/* --- Search (C string needle — convenience for runtime const char*) --- */
+
+size_t ztr_view_find_cstr(ztr_view v, const char *needle, size_t start);
+size_t ztr_view_rfind_cstr(ztr_view v, const char *needle, size_t start);
+bool ztr_view_contains_cstr(ztr_view v, const char *needle);
+bool ztr_view_starts_with_cstr(ztr_view v, const char *prefix);
+bool ztr_view_ends_with_cstr(ztr_view v, const char *suffix);
+size_t ztr_view_count_cstr(ztr_view v, const char *needle);
+
+/* --- Search (single character — memchr fast path) --- */
+
+size_t ztr_view_find_char(ztr_view v, char c, size_t start);
+size_t ztr_view_rfind_char(ztr_view v, char c, size_t start);
+bool ztr_view_contains_char(ztr_view v, char c);
+
+/* --- Trimming (returns narrowed view, no allocation) --- */
+
+ztr_view ztr_view_trim(ztr_view v);
+ztr_view ztr_view_trim_start(ztr_view v);
+ztr_view ztr_view_trim_end(ztr_view v);
+
+/* --- Slice manipulation (clamped) --- */
+
+static inline ztr_view ztr_view_remove_prefix(ztr_view v, size_t n) {
+    if (n >= v.len) return ZTR_VIEW_EMPTY;
+    ztr_view out;
+    out.data = v.data + n;
+    out.len = v.len - n;
+    return out;
+}
+
+static inline ztr_view ztr_view_remove_suffix(ztr_view v, size_t n) {
+    if (n >= v.len) return ZTR_VIEW_EMPTY;
+    ztr_view out;
+    out.data = v.data;
+    out.len = v.len - n;
+    return out;
+}
+
+/* --- Split iterator --- */
+
+typedef struct {
+    ztr_view ztr_p_remaining;
+    ztr_view ztr_p_delim;
+    bool ztr_p_done;
+} ztr_view_split_iter;
+
+_Static_assert(sizeof(ztr_view_split_iter) <= 48, "ztr_view_split_iter size check");
+
+void ztr_view_split_begin(ztr_view_split_iter *it, ztr_view s, ztr_view delim);
+void ztr_view_split_begin_cstr(ztr_view_split_iter *it, ztr_view s, const char *delim);
+bool ztr_view_split_next(ztr_view_split_iter *it, ztr_view *token);
+
+/* --- Utility --- */
+
+bool ztr_view_is_ascii(ztr_view v);
+bool ztr_view_is_valid_utf8(ztr_view v);
+
+/* --- Interop --- */
+
+/* Copy view data into an owned ztr. Works on both uninitialized (zeroed) and
+   already-initialized strings (frees existing content first). Safe when v
+   references s's own buffer (self-referential). */
+ztr_err ztr_from_view(ztr *s, ztr_view v);
 
 #endif /* ZTR_H */
