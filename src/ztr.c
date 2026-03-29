@@ -114,8 +114,22 @@ static inline bool ztr_p_is_ascii_space(char c) {
 /* Shared buffer-level helpers used by both ztr and ztr_view functions. */
 
 static bool ztr_p_is_ascii_buf(const unsigned char *data, size_t len) {
-    for (size_t i = 0; i < len; i++) {
-        if (data[i] > 0x7F) {
+    size_t i = 0;
+
+    /* Process 8 bytes at a time — accumulate high bits, check once. */
+    uint64_t acc = 0;
+    for (; i + 8 <= len; i += 8) {
+        uint64_t word;
+        memcpy(&word, data + i, 8);
+        acc |= word;
+    }
+    if (acc & UINT64_C(0x8080808080808080)) {
+        return false;
+    }
+
+    /* Scalar tail. */
+    for (; i < len; i++) {
+        if (data[i] & 0x80) {
             return false;
         }
     }
@@ -126,6 +140,19 @@ static bool ztr_p_is_valid_utf8_buf(const unsigned char *data, size_t len) {
     size_t i = 0;
 
     while (i < len) {
+        /* Fast-skip runs of ASCII bytes — 8 at a time. */
+        while (i + 8 <= len) {
+            uint64_t word;
+            memcpy(&word, data + i, 8);
+            if (word & UINT64_C(0x8080808080808080)) {
+                break;
+            }
+            i += 8;
+        }
+        if (i >= len) {
+            break;
+        }
+
         unsigned char b = data[i];
         size_t seq_len;
         uint32_t cp;
@@ -1581,13 +1608,6 @@ bool ztr_view_eq_ascii_nocase(ztr_view a, ztr_view b) {
     return true;
 }
 
-bool ztr_view_eq_ascii_nocase_cstr(ztr_view v, const char *cstr) {
-    if (!cstr) {
-        return v.len == 0;
-    }
-    return ztr_view_eq_ascii_nocase(v, ztr_view_from_cstr(cstr));
-}
-
 /* ---- View: Search (view needle) ---- */
 
 size_t ztr_view_find(ztr_view v, ztr_view needle, size_t start) {
@@ -1679,32 +1699,6 @@ size_t ztr_view_count(ztr_view v, ztr_view needle) {
         pos = found + needle.len;
     }
     return total;
-}
-
-/* ---- View: Search (C string needle) ---- */
-
-size_t ztr_view_find_cstr(ztr_view v, const char *needle, size_t start) {
-    return ztr_view_find(v, ztr_view_from_cstr(needle), start);
-}
-
-size_t ztr_view_rfind_cstr(ztr_view v, const char *needle, size_t start) {
-    return ztr_view_rfind(v, ztr_view_from_cstr(needle), start);
-}
-
-bool ztr_view_contains_cstr(ztr_view v, const char *needle) {
-    return ztr_view_contains(v, ztr_view_from_cstr(needle));
-}
-
-bool ztr_view_starts_with_cstr(ztr_view v, const char *prefix) {
-    return ztr_view_starts_with(v, ztr_view_from_cstr(prefix));
-}
-
-bool ztr_view_ends_with_cstr(ztr_view v, const char *suffix) {
-    return ztr_view_ends_with(v, ztr_view_from_cstr(suffix));
-}
-
-size_t ztr_view_count_cstr(ztr_view v, const char *needle) {
-    return ztr_view_count(v, ztr_view_from_cstr(needle));
 }
 
 /* ---- View: Search (single character) ---- */

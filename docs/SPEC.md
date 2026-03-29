@@ -967,19 +967,19 @@ ztr_err ztr_from_view(ztr *s, ztr_view v);
 | `ztr_view_cmp`                   | `int`         | No       | Comparison     |
 | `ztr_view_cmp_cstr`              | `int`         | No       | Comparison     |
 | `ztr_view_eq_ascii_nocase`       | `bool`        | No       | Comparison     |
-| `ztr_view_eq_ascii_nocase_cstr`  | `bool`        | No       | Comparison     |
+| `ztr_view_eq_ascii_nocase_cstr`  | `bool`        | Yes      | Comparison     |
 | `ztr_view_find`                  | `size_t`      | No       | Search (view)  |
 | `ztr_view_rfind`                 | `size_t`      | No       | Search (view)  |
 | `ztr_view_contains`              | `bool`        | No       | Search (view)  |
 | `ztr_view_starts_with`           | `bool`        | No       | Search (view)  |
 | `ztr_view_ends_with`             | `bool`        | No       | Search (view)  |
 | `ztr_view_count`                 | `size_t`      | No       | Search (view)  |
-| `ztr_view_find_cstr`             | `size_t`      | No       | Search (cstr)  |
-| `ztr_view_rfind_cstr`            | `size_t`      | No       | Search (cstr)  |
-| `ztr_view_contains_cstr`         | `bool`        | No       | Search (cstr)  |
-| `ztr_view_starts_with_cstr`      | `bool`        | No       | Search (cstr)  |
-| `ztr_view_ends_with_cstr`        | `bool`        | No       | Search (cstr)  |
-| `ztr_view_count_cstr`            | `size_t`      | No       | Search (cstr)  |
+| `ztr_view_find_cstr`             | `size_t`      | Yes      | Search (cstr)  |
+| `ztr_view_rfind_cstr`            | `size_t`      | Yes      | Search (cstr)  |
+| `ztr_view_contains_cstr`         | `bool`        | Yes      | Search (cstr)  |
+| `ztr_view_starts_with_cstr`      | `bool`        | Yes      | Search (cstr)  |
+| `ztr_view_ends_with_cstr`        | `bool`        | Yes      | Search (cstr)  |
+| `ztr_view_count_cstr`            | `size_t`      | Yes      | Search (cstr)  |
 | `ztr_view_find_char`             | `size_t`      | No       | Search (char)  |
 | `ztr_view_rfind_char`            | `size_t`      | No       | Search (char)  |
 | `ztr_view_contains_char`         | `bool`        | No       | Search (char)  |
@@ -995,7 +995,7 @@ ztr_err ztr_from_view(ztr *s, ztr_view v);
 | `ztr_view_is_valid_utf8`         | `bool`        | No       | Utility        |
 | `ztr_from_view`                  | `ztr_err`     | No       | Interop        |
 
-**Total: 40 `ztr_view` functions** (10 `static inline` in header, 30 in `ztr.c`).
+**Total: 40 `ztr_view` functions** (17 `static inline` in header, 23 in `ztr.c`).
 **4 view macros:** `ZTR_VIEW_EMPTY`, `ZTR_VIEW_LIT`, `ZTR_VIEW_FMT`, `ZTR_VIEW_ARG`. Additionally, `ZTR_FMT` and `ZTR_ARG` (documented in section 5) mirror the view macros for the owning `ztr` type.
 
 ---

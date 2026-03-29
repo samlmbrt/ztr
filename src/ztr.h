@@ -309,7 +309,9 @@ static inline ztr_view ztr_view_substr(ztr_view v, size_t pos, size_t count) {
 /* --- Accessors (static inline, infallible) --- */
 
 static inline size_t ztr_view_len(ztr_view v) { return v.len; }
+
 static inline const char *ztr_view_data(ztr_view v) { return v.data; }
+
 static inline bool ztr_view_is_empty(ztr_view v) { return v.len == 0; }
 
 /* Returns '\0' if i >= len (matches ztr_at behavior). */
@@ -324,7 +326,11 @@ bool ztr_view_eq_cstr(ztr_view v, const char *cstr);
 int ztr_view_cmp(ztr_view a, ztr_view b);
 int ztr_view_cmp_cstr(ztr_view v, const char *cstr);
 bool ztr_view_eq_ascii_nocase(ztr_view a, ztr_view b);
-bool ztr_view_eq_ascii_nocase_cstr(ztr_view v, const char *cstr);
+
+static inline bool ztr_view_eq_ascii_nocase_cstr(ztr_view v, const char *cstr) {
+    if (!cstr) return v.len == 0;
+    return ztr_view_eq_ascii_nocase(v, ztr_view_from_cstr(cstr));
+}
 
 /* --- Search (view needle) --- */
 
@@ -335,14 +341,34 @@ bool ztr_view_starts_with(ztr_view v, ztr_view prefix);
 bool ztr_view_ends_with(ztr_view v, ztr_view suffix);
 size_t ztr_view_count(ztr_view v, ztr_view needle);
 
-/* --- Search (C string needle — convenience for runtime const char*) --- */
+/* --- Search (C string needle — convenience for runtime const char*) ---
+   These are static inline so the compiler can constant-fold strlen for
+   string literals. For literals, prefer ZTR_VIEW_LIT with the view-needle
+   functions to avoid strlen entirely. */
 
-size_t ztr_view_find_cstr(ztr_view v, const char *needle, size_t start);
-size_t ztr_view_rfind_cstr(ztr_view v, const char *needle, size_t start);
-bool ztr_view_contains_cstr(ztr_view v, const char *needle);
-bool ztr_view_starts_with_cstr(ztr_view v, const char *prefix);
-bool ztr_view_ends_with_cstr(ztr_view v, const char *suffix);
-size_t ztr_view_count_cstr(ztr_view v, const char *needle);
+static inline size_t ztr_view_find_cstr(ztr_view v, const char *needle, size_t start) {
+    return ztr_view_find(v, ztr_view_from_cstr(needle), start);
+}
+
+static inline size_t ztr_view_rfind_cstr(ztr_view v, const char *needle, size_t start) {
+    return ztr_view_rfind(v, ztr_view_from_cstr(needle), start);
+}
+
+static inline bool ztr_view_contains_cstr(ztr_view v, const char *needle) {
+    return ztr_view_contains(v, ztr_view_from_cstr(needle));
+}
+
+static inline bool ztr_view_starts_with_cstr(ztr_view v, const char *prefix) {
+    return ztr_view_starts_with(v, ztr_view_from_cstr(prefix));
+}
+
+static inline bool ztr_view_ends_with_cstr(ztr_view v, const char *suffix) {
+    return ztr_view_ends_with(v, ztr_view_from_cstr(suffix));
+}
+
+static inline size_t ztr_view_count_cstr(ztr_view v, const char *needle) {
+    return ztr_view_count(v, ztr_view_from_cstr(needle));
+}
 
 /* --- Search (single character — memchr fast path) --- */
 
