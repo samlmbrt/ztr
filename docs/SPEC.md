@@ -7,7 +7,7 @@
 ### Design Goals
 
 - Modern ergonomics inspired by C++ `std::string`, Rust `String`, Kotlin `String`
-- Small and focused — essential operations done right
+- Small and focused — two files, ~1800 lines of implementation
 - Performant enough for embedded and constrained devices (Cortex-M4+)
 - Secure by default — safe APIs, no hidden undefined behavior
 - Seamless interop with `const char*` / existing C APIs
@@ -15,9 +15,9 @@
 
 ### Target
 
-- **Language:** C11 (requires `_Static_assert`, anonymous unions, `<stdalign.h>`)
+- **Language:** C11 (requires `_Static_assert`, anonymous unions)
 - **Platforms:** Any with standard user-space virtual memory
-- **Dependencies:** C11 standard library only (`<string.h>`, `<stdlib.h>`, `<stdint.h>`, `<stddef.h>`, `<stdbool.h>`)
+- **Dependencies:** C11 standard library only (`<string.h>`, `<stdlib.h>`, `<stdint.h>`, `<stddef.h>`, `<stdbool.h>`, `<limits.h>`)
 - **Optional dependency:** `<stdio.h>` (only when `ZTR_NO_FMT` is not defined)
 
 ### Library Structure
@@ -49,6 +49,11 @@ The following functions are inlined in the header for performance: `ztr_len`, `z
 #endif
 #ifndef ZTR_GROWTH_DEN
   #define ZTR_GROWTH_DEN  2
+#endif
+
+// Minimum heap allocation (default: 64 bytes)
+#ifndef ZTR_MIN_HEAP_CAP
+  #define ZTR_MIN_HEAP_CAP  64
 #endif
 
 // Feature gates
@@ -110,8 +115,6 @@ The high bit of the `len` field serves as the mode discriminator:
 
 The actual byte length is always `len & ~ZTR_HEAP_BIT`.
 
-This design avoids all pointer-value assumptions and endianness concerns. The discriminator is accessed via a simple bitwise AND on a native-width integer.
-
 ### SSO Details
 
 - SSO buffer: `sso[0]` through `sso[sizeof(char*) + sizeof(size_t) - 1]`
@@ -130,7 +133,7 @@ This design avoids all pointer-value assumptions and endianness concerns. The di
 
 ```c
 static inline bool ztr_p_is_heap(const ztr *s) {
-    return s->len & ZTR_HEAP_BIT;
+    return (s->len & ZTR_HEAP_BIT) != 0;
 }
 ```
 
@@ -167,9 +170,12 @@ typedef enum {
 #define ZTR_MAX_LEN     (SIZE_MAX >> 1)                        // max representable string length
 #define ZTR_NPOS        ((size_t)-1)                           // "not found" sentinel
 
-// Printf helpers for ztr (mirrors ZTR_VIEW_FMT/ZTR_VIEW_ARG)
+// Printf helpers for ztr (mirrors ZTR_VIEW_FMT/ZTR_VIEW_ARG).
+// len is clamped to INT_MAX to prevent sign-change UB in printf.
 #define ZTR_FMT         "%.*s"
-#define ZTR_ARG(s)      (int)ztr_len(s), ztr_cstr(s)
+#define ZTR_ARG(s)      (int)(ztr_len(s) > (size_t)INT_MAX             \
+                              ? (size_t)INT_MAX : ztr_len(s)),          \
+                         ztr_cstr(s)
 ```
 
 ---
@@ -315,8 +321,8 @@ All search functions use byte offsets and return `ZTR_NPOS` (`(size_t)-1`) when 
 
 **Empty needle behavior:** Passing an empty string `""` as needle:
 
-- `ztr_find`: returns `start` (the empty string is found at every position).
-- `ztr_rfind`: returns `start` (or `ztr_len(s)` if `start == ZTR_NPOS`).
+- `ztr_find`: returns `start` if `start <= len`, otherwise `ZTR_NPOS`.
+- `ztr_rfind`: returns `start` if `start <= len`, otherwise `ztr_len(s)`.
 - `ztr_contains`: returns `true`.
 - `ztr_starts_with` / `ztr_ends_with`: returns `true`.
 - `ztr_count`: returns `0` (no meaningful occurrences to count).
@@ -326,7 +332,7 @@ All search functions use byte offsets and return `ZTR_NPOS` (`(size_t)-1`) when 
 ```c
 // Find first occurrence of needle starting at byte offset start.
 // Returns byte index or ZTR_NPOS.
-// Algorithm: Two-Way (Crochemore-Perrin) for needles > 4 bytes. Naive for <= 4 bytes.
+// Algorithm: memchr to skip to candidate positions, memcmp to verify.
 size_t ztr_find(const ztr *s, const char *needle, size_t start);
 
 // Find last occurrence of needle at or before byte offset start.
@@ -370,6 +376,7 @@ ztr_err ztr_append_byte(ztr *s, char c);
 ztr_err ztr_append_fmt(ztr *s, const char *fmt, ...);
 
 // Insert a C string at byte position pos. Safe when cstr points into s.
+// Returns ZTR_ERR_OUT_OF_RANGE if pos > ztr_len(s).
 ztr_err ztr_insert(ztr *s, size_t pos, const char *cstr);
 
 // Insert a byte buffer with explicit length at byte position pos.
@@ -400,7 +407,7 @@ void ztr_truncate(ztr *s, size_t new_len);
 ztr_err ztr_reserve(ztr *s, size_t cap);
 
 // Reduce capacity to fit current length. May transition from heap to SSO.
-// No-op if the current slack is less than 16 bytes.
+// No-op if already in SSO mode or if the current slack is less than 16 bytes.
 void ztr_shrink_to_fit(ztr *s);
 ```
 
@@ -440,7 +447,7 @@ ztr_err ztr_substr(ztr *out, const ztr *s, size_t pos, size_t count);
 
 #### Zero-allocation split iterator (primary API)
 
-**Lifetime contract:** The source `ztr` passed to `ztr_split_begin` must not be modified or freed for the lifetime of the iterator. The `const char*` pointers returned by `ztr_split_next` point directly into the source string's buffer — they are invalidated if the source is mutated, freed, or goes out of scope. The iterator itself is a value type (40 bytes on 64-bit) and can be stack-allocated.
+**Lifetime contract:** The source `ztr` passed to `ztr_split_begin` must not be modified or freed for the lifetime of the iterator. The `const char*` pointers returned by `ztr_split_next` point directly into the source string's buffer — they are invalidated if the source is mutated, freed, or goes out of scope. The iterator is a value type (48 bytes on 64-bit) and can be stack-allocated.
 
 ```c
 typedef struct {
@@ -643,12 +650,12 @@ bool ztr_is_ascii(const ztr *s);
 When heap capacity is exceeded:
 
 ```c
-new_cap = old_cap * ZTR_GROWTH_NUM / ZTR_GROWTH_DEN;
-if (new_cap < required) new_cap = required;
-if (new_cap < 64) new_cap = 64;  // minimum first heap allocation
+new_cap = old_cap + old_cap * (ZTR_GROWTH_NUM - ZTR_GROWTH_DEN) / ZTR_GROWTH_DEN;
+if (new_cap < required)        new_cap = required;
+if (new_cap < ZTR_MIN_HEAP_CAP) new_cap = ZTR_MIN_HEAP_CAP;  // default: 64
 ```
 
-The 64-byte minimum on the first heap allocation avoids repeated small reallocations when a string slightly exceeds SSO capacity and continues to grow.
+The `ZTR_MIN_HEAP_CAP` floor avoids repeated small reallocations when a string slightly exceeds SSO capacity and continues to grow.
 
 ---
 
@@ -799,7 +806,9 @@ _Static_assert(sizeof(ztr_view) == sizeof(size_t) * 2, "unexpected ztr_view stru
 // Printf helpers: printf("val=" ZTR_VIEW_FMT "\n", ZTR_VIEW_ARG(v));
 // View data is NOT null-terminated — always use these macros, never %s.
 #define ZTR_VIEW_FMT       "%.*s"
-#define ZTR_VIEW_ARG(v)    (int)(v).len, (v).data
+#define ZTR_VIEW_ARG(v)    (int)((v).len > (size_t)INT_MAX              \
+                                ? (size_t)INT_MAX : (v).len),           \
+                            (v).data
 ```
 
 ### NULL Handling

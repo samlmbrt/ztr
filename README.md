@@ -3,19 +3,20 @@
 [![CI](https://github.com/samlmbrt/ztr/actions/workflows/ci.yml/badge.svg)](https://github.com/samlmbrt/ztr/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A modern, ergonomic, and secure string library for C.
+A C11 string library with small string optimization, UTF-8 support, and safe-by-default mutation.
 
-`ztr` provides a mutable, owning string type with small string optimization (SSO), UTF-8 awareness, and safe-by-default error handling. It targets C11 and has no dependencies beyond the standard library.
+`ztr` provides a mutable, owning string type (`ztr`) and a non-owning string view (`ztr_view`). Both target C11 with no dependencies beyond the standard library.
 
 ## Why ztr?
 
-C's standard string handling (`char*` + `strlen` + `strcat` + manual `malloc`) is error-prone, verbose, and hostile to both beginners and experts. `ztr` fixes this with a small, focused API that makes correct usage easy and incorrect usage hard:
+C's standard string handling (`char*` + `strlen` + `strcat` + manual `malloc`) is error-prone and verbose. `ztr` fixes this with a small, focused API that makes correct usage easy and incorrect usage hard:
 
 - **Small string optimization** — strings of 15 bytes or fewer (7 on 32-bit) live inline in the struct. No heap allocation, no pointer chasing.
 - **Branchless `ztr_len`** — length is always a single load + mask. No SSO/heap branching on the hottest accessor.
 - **Safe by default** — all mutation functions handle self-referential input (e.g., `ztr_append(&s, ztr_cstr(&s))`), check for integer overflow, and provide a strong guarantee (unmodified on error).
 - **Zero-init is valid** — `ztr s = {0}` is a valid empty string. No constructor call required.
 - **`const char*` interop** — `ztr_cstr()` is always O(1) and null-terminated. Pass it directly to `printf`, `fopen`, `strcmp`, or any C API.
+- **Non-owning views** — `ztr_view` references slices of existing buffers without allocating. Zero-copy parsing, searching, and trimming.
 
 ## Quick start
 
@@ -89,9 +90,53 @@ int main(void) {
 }
 ```
 
+## String views
+
+`ztr_view` is a non-owning, read-only reference to a contiguous byte range. It holds a pointer and a length, never allocates, and never frees. Use it for zero-copy parsing, matching, and passing substrings without copying.
+
+```c
+#include "ztr.h"
+#include <stdio.h>
+
+int main(void) {
+    ztr header = {0};
+    ztr_from(&header, "  Content-Type: text/html  ");
+
+    // Create a view, trim whitespace (no allocation)
+    ztr_view v = ztr_view_trim(ztr_view_from_ztr(&header));
+
+    // Compile-time literal views — no strlen
+    if (ztr_view_starts_with(v, ZTR_VIEW_LIT("Content-Type"))) {
+        ztr_view value = ztr_view_remove_prefix(v, 14);  // skip "Content-Type: "
+        printf("value: " ZTR_VIEW_FMT "\n", ZTR_VIEW_ARG(value));
+    }
+
+    // Split a view into tokens (zero allocation)
+    ztr_view csv = ztr_view_from_cstr("alice,bob,charlie");
+    ztr_view_split_iter it;
+    ztr_view_split_begin(&it, csv, ZTR_VIEW_LIT(","));
+    ztr_view token;
+    while (ztr_view_split_next(&it, &token)) {
+        printf(ZTR_VIEW_FMT "\n", ZTR_VIEW_ARG(token));
+    }
+
+    // Materialize a view into an owned string when needed
+    ztr owned = {0};
+    ztr_from_view(&owned, ztr_view_from_cstr("hello"));
+
+    ztr_free(&owned);
+    ztr_free(&header);
+    return 0;
+}
+```
+
+A `ztr_view` is invalidated if the underlying buffer is mutated or freed. Do not hold views across mutations of the source.
+
 ## API overview
 
-62 functions organized by category:
+102 functions — 62 owning (`ztr`) and 40 non-owning (`ztr_view`):
+
+### `ztr` — owning string
 
 | Category | Functions | Description |
 |---|---|---|
@@ -106,6 +151,38 @@ int main(void) {
 | UTF-8 | `ztr_is_valid_utf8`, `ztr_utf8_len`, `ztr_utf8_next`, `ztr_utf8_append` | Validation, codepoint counting, iteration, and encoding |
 | Interop | `ztr_data_mut`, `ztr_set_len`, `ztr_detach`, `ztr_swap` | Advanced: mutable buffer access, ownership transfer |
 | Utility | `ztr_is_ascii`, `ztr_err_str` | Character classification, error messages |
+
+### `ztr_view` — non-owning string view
+
+| Category | Functions | Description |
+|---|---|---|
+| Construction | `ztr_view_from_buf`, `ztr_view_from_cstr`, `ztr_view_from_ztr`, `ztr_view_substr` | Build a view from a buffer, C string, or `ztr`; extract a sub-view |
+| Accessors | `ztr_view_len`, `ztr_view_data`, `ztr_view_is_empty`, `ztr_view_at` | Read view properties (all inline) |
+| Comparison | `ztr_view_eq`, `ztr_view_eq_cstr`, `ztr_view_cmp`, `ztr_view_cmp_cstr`, `ztr_view_eq_ascii_nocase`, `ztr_view_eq_ascii_nocase_cstr` | Equality and ordering |
+| Search (view) | `ztr_view_find`, `ztr_view_rfind`, `ztr_view_contains`, `ztr_view_starts_with`, `ztr_view_ends_with`, `ztr_view_count` | Search with `ztr_view` needle — zero-copy, no `strlen` |
+| Search (cstr) | `ztr_view_find_cstr`, `ztr_view_rfind_cstr`, `ztr_view_contains_cstr`, `ztr_view_starts_with_cstr`, `ztr_view_ends_with_cstr`, `ztr_view_count_cstr` | Convenience wrappers for `const char*` needles |
+| Search (char) | `ztr_view_find_char`, `ztr_view_rfind_char`, `ztr_view_contains_char` | Single-byte search via `memchr` |
+| Trimming | `ztr_view_trim`, `ztr_view_trim_start`, `ztr_view_trim_end` | Return narrowed view, no allocation |
+| Slice | `ztr_view_remove_prefix`, `ztr_view_remove_suffix` | Advance or shrink bounds (clamped) |
+| Split | `ztr_view_split_begin`, `ztr_view_split_begin_cstr`, `ztr_view_split_next` | Zero-allocation iterator over delimited tokens |
+| Utility | `ztr_view_is_ascii`, `ztr_view_is_valid_utf8` | Classification and validation |
+| Interop | `ztr_from_view` | Copy view data into an owned `ztr` |
+
+### Printf helpers
+
+```c
+// Owned strings:
+printf("s=" ZTR_FMT "\n", ZTR_ARG(&s));
+
+// Views (not null-terminated — always use these macros, never %s):
+printf("v=" ZTR_VIEW_FMT "\n", ZTR_VIEW_ARG(v));
+
+// Compile-time view from a literal (no strlen):
+ztr_view sep = ZTR_VIEW_LIT(",");
+
+// Canonical empty view:
+ztr_view empty = ZTR_VIEW_EMPTY;
+```
 
 See [docs/SPEC.md](docs/SPEC.md) for the complete API reference with signatures, preconditions, edge cases, and error behavior.
 
@@ -156,9 +233,9 @@ Define these before including `ztr.h` or pass them as compiler flags:
 #define ZTR_REALLOC(ptr, size)  my_realloc(ptr, size)
 #define ZTR_FREE(ptr)           my_free(ptr)
 
-// Growth factor (default: 1.5x = 3/2)
+// Growth factor (default: 1.5x = 3/2). Override for constrained systems:
 #define ZTR_GROWTH_NUM  5
-#define ZTR_GROWTH_DEN  4   // 1.25x growth for memory-constrained systems
+#define ZTR_GROWTH_DEN  4   // 1.25x
 
 // Minimum heap allocation (default: 64 bytes)
 #define ZTR_MIN_HEAP_CAP  32
@@ -177,12 +254,18 @@ typedef struct ztr {
         char sso[sizeof(char *) + sizeof(size_t)];
     };
 } ztr;  // 24 bytes on 64-bit, 12 bytes on 32-bit
+
+typedef struct ztr_view {
+    const char *data;
+    size_t len;
+} ztr_view;  // 16 bytes on 64-bit, 8 bytes on 32-bit. Passed by value.
 ```
 
 - **SSO capacity:** 15 bytes (64-bit), 7 bytes (32-bit)
 - **`ztr_len`:** single load + mask, zero branches
 - **`ztr s = {0}`:** valid empty string, no constructor needed
 - **`ztr_free`:** resets to empty, double-free safe
+- **`ztr_view`:** non-owning, read-only, fits in 2 registers
 
 ## Documentation
 
